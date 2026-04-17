@@ -1,25 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  TextInput,
-  Modal,
-} from "react-native";
-import { Ionicons, Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import {
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import MapView, { Marker } from "react-native-maps";
 
-const GOOGLE_MAPS_API_KEY = 'YOUR_API_KEY'; // Replace with your Google Maps API key
+const GOOGLE_MAPS_API_KEY = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDjtYc3mEzbuK6qRklklCcyPkBPQu77huQ`; // Replace with your Google Maps API key
 
 export default function HomeScreen() {
   const router = useRouter(); // ✅ router added
   const [searchText, setSearchText] = useState("");
   const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const mapRef = useRef<MapView>(null);
+  const fullMapRef = useRef<MapView>(null);
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.78825,
     longitude: -122.4324,
@@ -27,36 +29,35 @@ export default function HomeScreen() {
     longitudeDelta: 0.0421,
   });
 
-  useEffect(() => {
-    if (searchText.trim()) {
-      geocodePlace(searchText);
-    }
-  }, [searchText]);
+  // Removed automatic geocoding on every keystroke to avoid API rate limits.
+  // Geocoding is now triggered on search submission.
 
-  const geocodePlace = async (place) => {
+  const geocodePlace = async (place: string) => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(place)}&key=${GOOGLE_MAPS_API_KEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(place)}&key=${GOOGLE_MAPS_API_KEY}`,
       );
       const data = await response.json();
       if (data.results && data.results.length > 0) {
         const location = data.results[0].geometry.location;
-        setMapRegion({
+        const newRegion = {
           latitude: location.lat,
           longitude: location.lng,
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
-        });
+        };
+        setMapRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion, 1000);
+        fullMapRef.current?.animateToRegion(newRegion, 1000);
       }
     } catch (error) {
-      console.error('Geocoding error:', error);
+      console.error("Geocoding error:", error);
     }
   };
 
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoRow}>
@@ -74,27 +75,28 @@ export default function HomeScreen() {
 
         {/* Search */}
         <View style={styles.searchBox}>
-          <Feather name="search" size={20} color="#00bcd4" />
+          <TouchableOpacity onPress={() => searchText.trim() && geocodePlace(searchText)}>
+            <Feather name="search" size={20} color="#00bcd4" />
+          </TouchableOpacity>
           <TextInput
             style={styles.searchInput}
             placeholder="Where are you heading next?"
             value={searchText}
             onChangeText={setSearchText}
+            onSubmitEditing={() => {
+              if (searchText.trim()) {
+                geocodePlace(searchText);
+              }
+            }}
+            returnKeyType="search"
           />
         </View>
 
         {/* Explore Map Card */}
         <View style={styles.card}>
-          <MapView
-            style={styles.mapImage}
-            region={mapRegion}
-            provider={MapView.PROVIDER_GOOGLE}
-          >
+          <MapView ref={mapRef} style={styles.mapImage} region={mapRegion}>
             {searchText ? (
-              <Marker
-                coordinate={mapRegion}
-                title={searchText}
-              />
+              <Marker coordinate={mapRegion} title={searchText} />
             ) : null}
           </MapView>
           <View style={styles.cardContent}>
@@ -108,9 +110,7 @@ export default function HomeScreen() {
               style={styles.viewBtn}
               onPress={() => setIsMapExpanded(true)}
             >
-              <Text style={{ color: "#fff", fontWeight: "600" }}>
-                View
-              </Text>
+              <Text style={{ color: "#fff", fontWeight: "600" }}>View</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -123,9 +123,7 @@ export default function HomeScreen() {
             </View>
             <View>
               <Text style={styles.cardTitle}>My Planning</Text>
-              <Text style={styles.cardSubtitle}>
-                Your upcoming itineraries
-              </Text>
+              <Text style={styles.cardSubtitle}>Your upcoming itineraries</Text>
             </View>
           </View>
 
@@ -141,13 +139,12 @@ export default function HomeScreen() {
           </View>
 
           {/* ✅ THIS BUTTON NOW NAVIGATES */}
-        <TouchableOpacity
-  style={styles.plannerBtn}
-  onPress={() => router.push("/planner")}
->
-  <Text style={styles.plannerText}>Open Planner ✏️</Text>
-</TouchableOpacity>
-
+          <TouchableOpacity
+            style={styles.plannerBtn}
+            onPress={() => router.push("/planner")}
+          >
+            <Text style={styles.plannerText}>Open Planner ✏️</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Ready To Go */}
@@ -155,14 +152,13 @@ export default function HomeScreen() {
           <Ionicons name="paper-plane" size={40} color="#fff" />
           <Text style={styles.readyTitle}>Ready to Go?</Text>
           <Text style={styles.readySubtitle}>
-            Start your navigation for "Weekend in Kyoto"
+            Start your navigation for &ldquo;Weekend in Kyoto&rdquo;
           </Text>
 
           <TouchableOpacity style={styles.routeBtn}>
             <Text style={styles.routeText}>START ROUTE →</Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
 
       {/* Map Modal */}
@@ -178,49 +174,19 @@ export default function HomeScreen() {
           >
             <Ionicons name="close" size={30} color="#fff" />
           </TouchableOpacity>
-          <MapView
-            style={styles.fullMap}
-            region={mapRegion}
-            provider={MapView.PROVIDER_GOOGLE}
-          >
+
+          <MapView ref={fullMapRef} style={styles.fullMap} region={mapRegion}>
             {searchText ? (
-              <Marker
-                coordinate={mapRegion}
-                title={searchText}
-              />
+              <Marker coordinate={mapRegion} title={searchText} />
             ) : null}
           </MapView>
+
         </View>
       </Modal>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <NavItem icon="home" label="Home" active />
-        <NavItem icon="bookmark" label="Saved" />
-        <NavItem icon="notifications" label="Inbox" />
-        <NavItem icon="settings" label="Settings" />
-      </View>
     </View>
   );
 }
-
-const NavItem = ({ icon, label, active }) => (
-  <View style={{ alignItems: "center" }}>
-    <Ionicons
-      name={icon}
-      size={22}
-      color={active ? "#00bcd4" : "#8e9e9f"}
-    />
-    <Text
-      style={{
-        fontSize: 12,
-        color: active ? "#00bcd4" : "#8e9e9f",
-      }}
-    >
-      {label}
-    </Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f2f5f6" },
@@ -337,18 +303,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   routeText: { fontWeight: "700" },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    height: 70,
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 0.5,
-    borderColor: "#ccc",
-  },
   modalContainer: { flex: 1, backgroundColor: "#000" },
   fullMap: { flex: 1 },
   closeBtn: {
