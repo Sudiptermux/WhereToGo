@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, memo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -20,24 +20,38 @@ import * as Haptics from "expo-haptics";
 
 const { width, height } = Dimensions.get("window");
 
-// HIGH-PERFORMANCE REEL v1.2 - UNIQUE_CACHE_BUSTER_9922
-const ReelItem = memo(({ 
+// SAFE MODE REEL (Static Image for Demo Stability)
+const ReelItem = ({ 
     item, 
     addToTrip, 
     isActive,
-    isAlreadySelected,
-    sharedPlayer,
-    videoSource
+    isAlreadySelected
 }: { 
-    item: Place; 
+    item: any; 
     addToTrip: (item: any) => void;
     isActive: boolean;
     isAlreadySelected: boolean;
-    sharedPlayer: any;
-    videoSource: any;
 }) => {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(false);
+  
+  const primaryMedia = item.place_media?.find((m: any) => m.is_primary) || item.place_media?.[0];
+  const videoSource = item.video || item.place_media?.find((m: any) => m.media_type === 'video')?.url;
+  
+  const player = useVideoPlayer(videoSource, (player) => {
+    player.loop = true;
+    player.muted = true;
+  });
+
+  useEffect(() => {
+    if (isActive && videoSource) {
+      player.play();
+      player.muted = false; // Audio ON when watching
+    } else {
+      player.pause();
+      player.muted = true;  // Mute when scrolled away
+    }
+  }, [isActive, videoSource]);
 
   const getSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
@@ -52,18 +66,18 @@ const ReelItem = memo(({
 
   return (
     <View style={styles.reelContainer}>
-      {/* Background Layer: High-Quality Thumbnail always present */}
+      {/* Background Layer: Blurred Full Bleed */}
       <Image 
         source={getSource(item.image)} 
         style={styles.backgroundImage}
         resizeMode="cover"
-        blurRadius={isActive && videoSource ? 15 : 0}
+        blurRadius={25}
       />
       
-      {/* Foreground Layer: ACTIVE Video View */}
-      {isActive && videoSource ? (
+      {/* Foreground Layer: Video if active, else Static Image */}
+      {videoSource && isActive ? (
         <VideoView 
-          player={sharedPlayer} 
+          player={player} 
           style={styles.foregroundImage} 
           contentFit="contain"
           nativeControls={false}
@@ -92,6 +106,7 @@ const ReelItem = memo(({
       />
 
       <View style={styles.contentOverlay}>
+        {/* Left Side: Info */}
         <View style={styles.leftInfo}>
           <View style={styles.trendingBadge}>
             <View style={styles.dot} />
@@ -112,12 +127,22 @@ const ReelItem = memo(({
           </Text>
         </View>
 
+        {/* Right Side: Premium Sidebar */}
         <View style={styles.sidebar}>
-          <TouchableOpacity style={styles.premiumActionButton} onPress={handleAdd}>
+          <TouchableOpacity 
+            style={styles.premiumActionButton}
+            onPress={handleAdd}
+          >
             <View style={[styles.premiumIconCircle, isAlreadySelected && styles.premiumIconCircleActive]}>
-              <Ionicons name={isAlreadySelected ? "checkmark" : "add"} size={26} color={isAlreadySelected ? "#00bcd4" : "#fff"} />
+              <Ionicons 
+                name={isAlreadySelected ? "checkmark" : "add"} 
+                size={26} 
+                color={isAlreadySelected ? "#00bcd4" : "#fff"} 
+              />
             </View>
-            <Text style={[styles.premiumActionLabel, isAlreadySelected && { color: '#00bcd4' }]}>{isAlreadySelected ? "SAVED" : "ADD"}</Text>
+            <Text style={[styles.premiumActionLabel, isAlreadySelected && { color: '#00bcd4' }]}>
+                {isAlreadySelected ? "SAVED" : "ADD"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.premiumActionButton} onPress={() => {
@@ -147,41 +172,23 @@ const ReelItem = memo(({
       </View>
     </View>
   );
-});
+};
 
 export default function DiscoveryScreen() {
   const router = useRouter();
   const { area, placeId } = useLocalSearchParams();
-  const { addToTrip, removeFromTrip, selectedPlaces, isPlaceSelected } = useTrip();
+  const { addToTrip, selectedPlaces, isPlaceSelected } = useTrip();
   const [places, setPlaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // SHARED PLAYER POOL (The Performance Engine)
-  const sharedPlayer = useVideoPlayer(null, (p) => {
-    p.loop = true;
-    p.muted = false; // Always unmuted when playing active
-    console.log("[WhereToGo] High-Performance Player Engine Initialized");
-  });
-
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 80 // Higher threshold for more "intentional" snaps
+    itemVisiblePercentThreshold: 50
   }).current;
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
-      const activeItem = viewableItems[0].item;
-      setActiveId(activeItem.id);
-      
-      let vSource = activeItem.video || activeItem.place_media?.find((m: any) => m.media_type === 'video')?.url;
-      if (vSource) {
-          // Normalize source for expo-video
-          const normalizedSource = typeof vSource === 'string' ? { uri: vSource } : vSource;
-          sharedPlayer.replace(normalizedSource);
-          sharedPlayer.play();
-      } else {
-          sharedPlayer.pause();
-      }
+      setActiveId(viewableItems[0].item.id);
     }
   }).current;
 
@@ -205,6 +212,7 @@ export default function DiscoveryScreen() {
         setLoading(false);
       }
     };
+
     fetchPlaces();
   }, [area, placeId]);
 
@@ -219,11 +227,15 @@ export default function DiscoveryScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={28} color="#fff" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.itineraryBadge} onPress={() => router.push("/map")}>
+      <TouchableOpacity 
+        style={styles.itineraryBadge}
+        onPress={() => router.push("/map")}
+      >
         <LinearGradient colors={["rgba(0,0,0,0.5)", "rgba(0,0,0,0.8)"]} style={styles.badgeGradient}>
             <Ionicons name="briefcase" size={20} color="#00bcd4" />
             <View style={styles.countBubble}>
@@ -232,32 +244,31 @@ export default function DiscoveryScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
-      <FlatList
-        data={places}
-        renderItem={({ item }) => (
-          <ReelItem 
-            item={item} 
-            addToTrip={addToTrip} 
-            isActive={item.id === activeId} 
-            isAlreadySelected={isPlaceSelected(item.id)}
-            sharedPlayer={sharedPlayer}
-            videoSource={item.video || item.place_media?.find((m: any) => m.media_type === 'video')?.url}
-          />
-        )}
-        keyExtractor={(item) => item.id}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        snapToInterval={height}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        // STABILITY TUNING
-        windowSize={3}
-        initialNumToRender={2}
-        maxToRenderPerBatch={2}
-        removeClippedSubviews={true}
-      />
+      {places.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+           <Text style={{ color: '#fff' }}>No places found here yet.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={places}
+          renderItem={({ item }) => (
+              <ReelItem 
+                  item={item} 
+                  addToTrip={addToTrip} 
+                  isActive={item.id === activeId} 
+                  isAlreadySelected={isPlaceSelected(item.id)}
+              />
+          )}
+          keyExtractor={(item) => item.id}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          snapToInterval={height}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+        />
+      )}
     </View>
   );
 }
