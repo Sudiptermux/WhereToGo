@@ -1,14 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
-const tabScreens = [
-  { name: "home", title: "Home", icon: "home" },
-  { name: "inbox", title: "Inbox", icon: "mail" },
-  { name: "planner", title: "Planner", icon: "calendar" },
-  { name: "saved", title: "Saved", icon: "bookmark" },
-  { name: "settings", title: "Settings", icon: "settings" },
-];
-
 export default function TabsLayout() {
   return (
     <Tabs

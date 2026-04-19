@@ -67,9 +67,6 @@ export default function HomeScreen() {
   };
 
   const renderExploreItem = ({ item }: { item: any }) => {
-    const primaryImg = item.place_media?.find((m: any) => m.media_type === 'image')?.url || 
-                     item.place_media?.[0]?.url;
-
     const getImgSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
     return (
@@ -77,11 +74,18 @@ export default function HomeScreen() {
         style={styles.exploreCard}
         onPress={() => router.push({ pathname: "/discovery", params: { placeId: item.id } })}
       >
-        <Image source={getImgSource(primaryImg)} style={styles.exploreImage} />
+        <Image source={getImgSource(item.image)} style={styles.exploreImage} />
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.8)"]}
           style={styles.exploreGradient}
         />
+        
+        {item.isMissingMedia && (
+          <View style={styles.comingSoonBadgeHome}>
+             <Text style={styles.comingSoonTextHome}>COMING SOON</Text>
+          </View>
+        )}
+
         <View style={styles.exploreContent}>
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{item.category?.toUpperCase()}</Text>
@@ -97,9 +101,6 @@ export default function HomeScreen() {
   };
 
   const renderTrendingItem = (item: any) => {
-    const primaryImg = item.place_media?.find((m: any) => m.media_type === 'image')?.url || 
-                     item.place_media?.[0]?.url;
-    
     const getImgSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
     return (
@@ -108,7 +109,14 @@ export default function HomeScreen() {
         style={styles.trendingCard}
         onPress={() => router.push({ pathname: "/details", params: { id: item.id } })}
       >
-        <Image source={getImgSource(primaryImg)} style={styles.trendingImage} />
+        <View style={styles.trendingImageWrapper}>
+            <Image source={getImgSource(item.image)} style={styles.trendingImage} />
+            {item.isMissingMedia && (
+                <View style={styles.trendingComingSoonPatch}>
+                    <Text style={styles.comingSoonTextSmall}>NEW</Text>
+                </View>
+            )}
+        </View>
         <View style={styles.trendingInfo}>
           <View>
             <Text style={styles.trendingTitle}>{item.title}</Text>
@@ -440,5 +448,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     marginLeft: 4,
+  },
+  comingSoonBadgeHome: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ff9800",
+  },
+  comingSoonTextHome: {
+    color: "#ff9800",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  trendingImageWrapper: {
+    position: 'relative',
+  },
+  trendingComingSoonPatch: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "#ff9800",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#121212",
+  },
+  comingSoonTextSmall: {
+    color: "#000",
+    fontSize: 6,
+    fontWeight: "900",
   },
 });

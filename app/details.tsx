@@ -33,7 +33,6 @@ export default function PlaceDetailsScreen() {
       setLoading(true);
       try {
         const data = await placeService.getPlaceById(id as string);
-        
         if (!data) throw new Error("Place not found");
         setPlace(data);
       } catch (err) {
@@ -45,6 +44,20 @@ export default function PlaceDetailsScreen() {
 
     if (id) fetchDetails();
   }, [id]);
+
+  const getIsOpen = () => {
+    if (!place?.opening_time || !place?.closing_time) return null;
+    const now = new Date();
+    const currTime = now.getHours() * 60 + now.getMinutes();
+    
+    const [openH, openM] = place.opening_time.split(':').map(Number);
+    const [closeH, closeM] = place.closing_time.split(':').map(Number);
+    
+    const openTime = openH * 60 + openM;
+    const closeTime = closeH * 60 + closeM;
+    
+    return currTime >= openTime && currTime <= closeTime;
+  };
 
   if (loading) {
     return (
@@ -66,166 +79,164 @@ export default function PlaceDetailsScreen() {
   }
 
   const isSelected = selectedPlaces.some((p) => p.id === place.id);
-
-  // Get primary video/image URL
-  const primaryMedia = place.place_media?.find((m: any) => m.is_primary) || place.place_media?.[0];
-  const gallery = place.place_media?.filter((m: any) => m.media_type === 'image') || [];
+  const isOpen = getIsOpen();
+  const gallery = place.place_media?.filter((m: any) => !m.isPlaceholder && m.media_type === 'image') || [];
 
   const openInMaps = () => {
-    const latitude = place.lat;
-    const longitude = place.lng;
-    const label = place.title;
-    
     const url = Platform.select({
-      ios: `maps:0,0?q=${label}@${latitude},${longitude}`,
-      android: `geo:0,0?q=${latitude},${longitude}(${label})`,
+      ios: `maps:0,0?q=${place.title}@${place.lat},${place.lng}`,
+      android: `geo:0,0?q=${place.lat},${place.lng}(${place.title})`,
     });
-
     if (url) {
-      Linking.canOpenURL(url).then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
-        }
-      });
+      Linking.canOpenURL(url).then(supp => supp ? Linking.openURL(url) : Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`));
     }
   };
+
+  const getImgSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Hero Image Section */}
+        {/* --- HERO SECTION --- */}
         <View style={styles.heroContainer}>
-            <Image 
-                source={typeof primaryMedia?.url === 'number' ? primaryMedia.url : { uri: primaryMedia?.url }} 
-                style={styles.heroImage}
-            />
+            <Image source={getImgSource(place.image)} style={styles.heroImage} />
             <LinearGradient
-                colors={["rgba(0,0,0,0.4)", "transparent", "transparent", "black"]}
+                colors={["rgba(0,0,0,0.5)", "transparent", "rgba(6,6,6,1)"]}
                 style={styles.heroOverlay}
             />
             
-            {/* Custom Header */}
             <SafeAreaView style={styles.topHeader}>
-                <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={22} color="#fff" />
+                <TouchableOpacity style={styles.glassButton} onPress={() => router.back()}>
+                    <Ionicons name="chevron-back" size={24} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                    <Ionicons name="share-outline" size={22} color="#fff" />
+                <TouchableOpacity style={styles.glassButton}>
+                    <Ionicons name="share-social-outline" size={22} color="#fff" />
                 </TouchableOpacity>
             </SafeAreaView>
+
+            {place.isMissingMedia && (
+                <View style={styles.comingSoonBadge}>
+                    <MaterialCommunityIcons name="image-off" size={16} color="#ff9800" />
+                    <Text style={styles.comingSoonText}>VISUALS COMING SOON</Text>
+                </View>
+            )}
         </View>
 
-        {/* Info Content Card */}
-        <View style={styles.contentCard}>
-            <View style={styles.cardHeader}>
-                <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryText}>{place.category?.toUpperCase() || "ICONIC LANDMARK"}</Text>
-                </View>
-                <View style={styles.ratingBadge}>
-                    <Ionicons name="star" size={14} color="#FFD700" />
-                    <Text style={styles.ratingText}>{place.rating || "5.0"}</Text>
-                </View>
-            </View>
-
-            <Text style={styles.title}>{place.title}</Text>
-            <View style={styles.locationRow}>
-                <Ionicons name="location" size={18} color="#00bcd4" />
-                <Text style={styles.locationText}>{place.location_display}</Text>
-            </View>
-
-            <Text style={styles.description}>
-                {place.description_full || place.description_short}
-            </Text>
-
-            <TouchableOpacity style={styles.mapButton} onPress={openInMaps}>
-                <MaterialCommunityIcons name="map-marker-path" size={20} color="#fff" />
-                <Text style={styles.mapButtonText}>Explore Route in Maps</Text>
-            </TouchableOpacity>
-        </View>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-                <View style={[styles.statIcon, { backgroundColor: "rgba(255, 152, 0, 0.1)" }]}>
-                    <Feather name="clock" size={18} color="#ff9800" />
-                </View>
-                <View>
-                    <Text style={styles.statLabel}>MAGIC HOUR</Text>
-                    <Text style={styles.statValue}>{place.best_visit_time || "Morning"}</Text>
-                </View>
-            </View>
-
-            <View style={styles.statBox}>
-                <View style={[styles.statIcon, { backgroundColor: "rgba(0, 188, 212, 0.1)" }]}>
-                    <Ionicons name="ticket" size={18} color="#00bcd4" />
-                </View>
-                <View>
-                    <Text style={styles.statLabel}>ENTRY FEE</Text>
-                    <Text style={styles.statValue}>{place.entry_fee || "Free"}</Text>
-                </View>
-            </View>
-        </View>
-
-        {/* Gallery Section */}
-        {gallery.length > 0 && (
-            <View style={styles.gallerySection}>
-                <View style={styles.galleryHeader}>
-                    <Text style={styles.galleryTitle}>Visual Journey</Text>
-                    <View style={styles.galleryBadge}>
-                        <Text style={styles.galleryBadgeText}>{gallery.length} PHOTOS</Text>
+        {/* --- CONTENT SECTION --- */}
+        <View style={styles.mainContent}>
+            {/* Header / Title Area */}
+            <View style={styles.headerRow}>
+                <View style={styles.titleInfo}>
+                    <View style={styles.categoryRow}>
+                        <Text style={styles.categoryLabel}>{place.category?.toUpperCase()}</Text>
+                        <View style={styles.dot} />
+                        <View style={styles.statusBadge(isOpen)}>
+                            <Text style={styles.statusText(isOpen)}>
+                                {isOpen === null ? "HOURS VARIES" : (isOpen ? "OPEN NOW" : "CLOSED")}
+                            </Text>
+                        </View>
+                    </View>
+                    <Text style={styles.titleText}>{place.title}</Text>
+                    <View style={styles.locationRow}>
+                        <Ionicons name="location-sharp" size={16} color="#00bcd4" />
+                        <Text style={styles.locationText}>{place.location_display}</Text>
                     </View>
                 </View>
-                <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.galleryScroll}
-                >
-                    {gallery.map((img: any, idx: number) => (
-                        <TouchableOpacity key={idx} style={styles.galleryItem}>
-                            <Image source={typeof img.url === 'number' ? img.url : { uri: img.url }} style={styles.galleryImage} />
-                            <LinearGradient
-                                colors={["transparent", "rgba(0,0,0,0.4)"]}
-                                style={styles.galleryOverlay}
-                            />
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+                <View style={styles.ratingCircle}>
+                    <Text style={styles.ratingValue}>{place.rating}</Text>
+                    <Ionicons name="star" size={12} color="#FFD700" />
+                </View>
             </View>
-        )}
 
-        <View style={{ height: 120 }} />
-      </ScrollView>
+            {/* Quick Stats Grid */}
+            <View style={styles.statsGrid}>
+                <View style={styles.statGridItem}>
+                    <Feather name="clock" size={20} color="#00bcd4" />
+                    <Text style={styles.statGridLabel}>DURATION</Text>
+                    <Text style={styles.statGridValue}>{place.avg_duration_mins}m</Text>
+                </View>
+                <View style={styles.statGridItem}>
+                    <MaterialCommunityIcons name="ticket-outline" size={22} color="#00bcd4" />
+                    <Text style={styles.statGridLabel}>ENTRY</Text>
+                    <Text style={styles.statGridValue}>{place.entry_fee || "Free"}</Text>
+                </View>
+                <View style={styles.statGridItem}>
+                    <Ionicons name="sunny-outline" size={22} color="#00bcd4" />
+                    <Text style={styles.statGridLabel}>BEST TIME</Text>
+                    <Text style={styles.statGridValue}>{place.best_visit_time || "Daylight"}</Text>
+                </View>
+            </View>
 
-      {/* Footer Add to Trip */}
-      <View style={styles.footer}>
-        <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.9)", "#000"]}
-            style={styles.footerGradient}
-        >
-            <View style={styles.footerRow}>
-                <View style={styles.priceSection}>
-                    <Text style={styles.entryLabel}>Avg. Visit Duration</Text>
-                    <Text style={styles.priceText}>{Math.floor(place.avg_duration_mins / 60)} <Text style={styles.hoursSuffix}>hours</Text></Text>
+            {/* About Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About this place</Text>
+                <Text style={styles.descriptionText}>
+                    {place.description_full}
+                </Text>
+            </View>
+
+            {/* Operating Hours & Location Section */}
+            <View style={styles.infoSection}>
+                <View style={styles.infoRow}>
+                    <View style={styles.infoIconBox}>
+                        <Feather name="calendar" size={18} color="#8e9e9f" />
+                    </View>
+                    <View>
+                        <Text style={styles.infoLabel}>OPERATING HOURS</Text>
+                        <Text style={styles.infoValue}>
+                            {place.opening_time} - {place.closing_time}
+                        </Text>
+                    </View>
                 </View>
 
-                <TouchableOpacity 
-                    style={[styles.addButton, isSelected && styles.addedButton]}
-                    onPress={() => addToTrip(place)}
-                >
-                    <Ionicons 
-                        name={isSelected ? "checkmark-circle" : "add-circle"} 
-                        size={20} 
-                        color={isSelected ? "#00bcd4" : "#121212"} 
-                    />
-                    <Text style={[styles.addButtonText, isSelected && styles.addedButtonText]}>
-                        {isSelected ? "Saved" : "Add to Trip"}
-                    </Text>
+                <TouchableOpacity style={styles.navigationCard} onPress={openInMaps}>
+                    <View style={styles.navInfo}>
+                        <Text style={styles.navTitle}>Ready to explore?</Text>
+                        <Text style={styles.navSubtitle}>Get precise turn-by-turn directions</Text>
+                    </View>
+                    <LinearGradient colors={["#00bcd4", "#008ba3"]} style={styles.navIcon}>
+                        <MaterialCommunityIcons name="directions" size={24} color="#fff" />
+                    </LinearGradient>
                 </TouchableOpacity>
             </View>
+
+            {/* Gallery Section */}
+            {gallery.length > 1 && (
+                <View style={styles.galleryContainer}>
+                    <Text style={styles.sectionTitle}>Visual Journey</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryScroll}>
+                        {gallery.slice(1).map((img: any, i: number) => (
+                            <View key={i} style={styles.galleryCard}>
+                                <Image source={getImgSource(img.url)} style={styles.galleryImg} />
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+        </View>
+
+        <View style={{ height: 140 }} />
+      </ScrollView>
+
+      {/* Floating Action Bar */}
+      <View style={styles.footer}>
+        <LinearGradient colors={["transparent", "rgba(6,6,6,0.9)", "#060606"]} style={styles.footerGradient}>
+           <View style={styles.footerActions}>
+                <TouchableOpacity style={styles.saveBtn}>
+                    <Ionicons name="bookmark-outline" size={24} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.primaryBtn, isSelected && styles.addedBtn]}
+                    onPress={() => addToTrip(place)}
+                >
+                    <Ionicons name={isSelected ? "checkmark-circle" : "add-circle"} size={22} color={isSelected ? "#00bcd4" : "#000"} />
+                    <Text style={[styles.primaryBtnText, isSelected && { color: "#00bcd4" }]}>
+                        {isSelected ? "IN YOUR TRIP" : "ADD TO PLAN"}
+                    </Text>
+                </TouchableOpacity>
+           </View>
         </LinearGradient>
       </View>
     </View>
@@ -233,31 +244,12 @@ export default function PlaceDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#060606",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#060606',
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  heroContainer: {
-    height: height * 0.45,
-    width: width,
-  },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  container: { flex: 1, backgroundColor: "#060606" },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#060606' },
+  scrollContent: { flexGrow: 1 },
+  heroContainer: { height: height * 0.5, width: width },
+  heroImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  heroOverlay: { ...StyleSheet.absoluteFillObject },
   topHeader: {
     position: "absolute",
     top: 20,
@@ -266,256 +258,128 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.5)",
+  glassButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  contentCard: {
-    backgroundColor: "#121212",
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    marginTop: -40,
-    padding: 30,
-    paddingTop: 35,
-  },
-  cardHeader: {
+  comingSoonBadge: {
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.8)",
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#ff9800",
   },
-  categoryBadge: {
-    backgroundColor: "rgba(255, 152, 0, 0.15)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  categoryText: {
+  comingSoonText: {
     color: "#ff9800",
     fontSize: 10,
-    fontWeight: "800",
+    fontWeight: "900",
+    marginLeft: 8,
     letterSpacing: 1,
   },
-  ratingBadge: {
+  mainContent: {
+    marginTop: -30,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    backgroundColor: "#060606",
+    paddingTop: 30,
+  },
+  headerRow: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  ratingText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-    marginLeft: 4,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: "#fff",
-    marginBottom: 10,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 25,
-  },
-  locationText: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 14,
-    marginLeft: 6,
-    fontWeight: "500",
-  },
-  description: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.7)",
-    lineHeight: 26,
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
     marginBottom: 30,
   },
-  mapButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    paddingVertical: 18,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  mapButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    marginLeft: 10,
-  },
-  statsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    marginBottom: 25,
-    justifyContent: "space-between",
-  },
-  statBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    width: (width - 55) / 2,
-    padding: 16,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  statLabel: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 9,
-    fontWeight: "800",
-    marginBottom: 2,
-  },
-  statValue: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-  },
-  footerGradient: {
-    flex: 1,
-    justifyContent: "flex-end",
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  priceSection: {
-    flex: 1,
-  },
-  entryLabel: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 11,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  priceText: {
-    color: "#00bcd4",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  hoursSuffix: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.5)",
-    fontWeight: "500",
-  },
-  addButton: {
-    flex: 1.2,
-    flexDirection: "row",
-    backgroundColor: "#00bcd4",
-    paddingVertical: 18,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#00bcd4",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  addedButton: {
-    backgroundColor: "rgba(0, 188, 212, 0.1)",
-    borderWidth: 1,
-    borderColor: "#00bcd4",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  addButtonText: {
-    color: "#121212",
-    fontSize: 16,
-    fontWeight: "800",
-    marginLeft: 8,
-  },
-  addedButtonText: {
-    color: "#00bcd4",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
-  },
-  errorText: {
-    color: "#fff",
-    fontSize: 18,
-  },
-  backLink: {
-    color: "#00bcd4",
-    marginTop: 10,
-  },
-  gallerySection: {
-    marginTop: 30,
-    paddingHorizontal: 20,
-  },
-  galleryHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  galleryTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  galleryBadge: {
-    backgroundColor: "rgba(0, 188, 212, 0.1)",
-    paddingHorizontal: 10,
+  titleInfo: { flex: 1, marginRight: 20 },
+  categoryRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  categoryLabel: { color: "#8e9e9f", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "#333", marginHorizontal: 10 },
+  statusBadge: (isOpen: any) => ({
+    backgroundColor: isOpen === null ? "#1a1a1a" : (isOpen ? "rgba(76, 175, 80, 0.1)" : "rgba(244, 67, 54, 0.1)"),
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(0, 188, 212, 0.2)",
-  },
-  galleryBadgeText: {
-    color: "#00bcd4",
-    fontSize: 10,
+  }),
+  statusText: (isOpen: any) => ({
+    color: isOpen === null ? "#8e9e9f" : (isOpen ? "#4CAF50" : "#F44336"),
+    fontSize: 9,
     fontWeight: "900",
+  }),
+  titleText: { fontSize: 32, fontWeight: "900", color: "#fff", marginBottom: 8, letterSpacing: -0.5 },
+  locationRow: { flexDirection: "row", alignItems: "center" },
+  locationText: { color: "#8e9e9f", fontSize: 13, marginLeft: 4, fontWeight: "600" },
+  ratingCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#121212",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
   },
-  galleryScroll: {
-    paddingRight: 40,
+  ratingValue: { color: "#fff", fontSize: 18, fontWeight: "900", marginBottom: 2 },
+  statsGrid: {
+    flexDirection: "row",
+    paddingHorizontal: 24,
+    justifyContent: "space-between",
+    marginBottom: 35,
   },
-  galleryItem: {
-    width: 140,
-    height: 180,
-    marginRight: 15,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: "#1a1a1a",
+  statGridItem: {
+    width: (width - 68) / 3,
+    backgroundColor: "#121212",
+    padding: 16,
+    borderRadius: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
   },
-  galleryImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
+  statGridLabel: { color: "#555", fontSize: 9, fontWeight: "800", marginTop: 8, marginBottom: 4 },
+  statGridValue: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  section: { paddingHorizontal: 24, marginBottom: 35 },
+  sectionTitle: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 15 },
+  descriptionText: { color: "rgba(255,255,255,0.65)", fontSize: 16, lineHeight: 28, fontWeight: "500" },
+  infoSection: { paddingHorizontal: 24, marginBottom: 35 },
+  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 25 },
+  infoIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#121212", justifyContent: "center", alignItems: "center", marginRight: 15, borderWidth: 1, borderColor: "#1a1a1a" },
+  infoLabel: { color: "#555", fontSize: 10, fontWeight: "800", marginBottom: 4, letterSpacing: 0.5 },
+  infoValue: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  navigationCard: {
+    flexDirection: "row",
+    backgroundColor: "#121212",
+    padding: 20,
+    borderRadius: 28,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
   },
-  galleryOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  navInfo: { flex: 1 },
+  navTitle: { color: "#fff", fontSize: 18, fontWeight: "800", marginBottom: 4 },
+  navSubtitle: { color: "#555", fontSize: 12, fontWeight: "600" },
+  navIcon: { width: 56, height: 56, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+  galleryContainer: { marginBottom: 40 },
+  galleryScroll: { paddingHorizontal: 24 },
+  galleryCard: { width: 220, height: 280, borderRadius: 30, overflow: "hidden", marginRight: 15, backgroundColor: "#121212" },
+  galleryImg: { width: "100%", height: "100%", resizeMode: "cover" },
+  footer: { position: "absolute", bottom: 0, left: 0, right: 0, height: 120 },
+  footerGradient: { flex: 1, justifyContent: "flex-end", paddingBottom: 30, paddingHorizontal: 24 },
+  footerActions: { flexDirection: "row", alignItems: "center" },
+  saveBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center", marginRight: 15, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  primaryBtn: { flex: 1, height: 60, borderRadius: 30, backgroundColor: "#00bcd4", flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#00bcd4", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 },
+  addedBtn: { backgroundColor: "rgba(0,188,212,0.1)", borderWidth: 1, borderColor: "#00bcd4", shadowOpacity: 0 },
+  primaryBtnText: { color: "#000", fontSize: 15, fontWeight: "900", marginLeft: 10 },
+  errorContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+  errorText: { color: "#fff", fontSize: 18 },
+  backLink: { color: "#00bcd4", marginTop: 10 },
 });

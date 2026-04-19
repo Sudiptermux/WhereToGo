@@ -46,8 +46,10 @@ const ReelItem = ({
   useEffect(() => {
     if (isActive && videoSource) {
       player.play();
+      player.muted = false; // Audio ON when watching
     } else {
       player.pause();
+      player.muted = true;  // Mute when scrolled away
     }
   }, [isActive, videoSource]);
 
@@ -55,14 +57,18 @@ const ReelItem = ({
 
   const handleAdd = () => {
      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-     addToTrip(item);
+     if (isAlreadySelected) {
+       removeFromTrip(item.id);
+     } else {
+       addToTrip(item);
+     }
   };
 
   return (
     <View style={styles.reelContainer}>
       {/* Background Layer: Blurred Full Bleed */}
       <Image 
-        source={getSource(primaryMedia?.url)} 
+        source={getSource(item.image)} 
         style={styles.backgroundImage}
         resizeMode="cover"
         blurRadius={25}
@@ -77,15 +83,25 @@ const ReelItem = ({
           nativeControls={false}
         />
       ) : (
-        <Image 
-          source={getSource(primaryMedia?.url)} 
-          style={styles.foregroundImage}
-          resizeMode="contain"
-        />
+        <View style={styles.foregroundImage}>
+            <Image 
+                source={getSource(item.image)} 
+                style={styles.fullImage}
+                resizeMode="contain"
+            />
+            {(!videoSource || item.isMissingMedia) && (
+                <View style={[StyleSheet.absoluteFill, styles.comingSoonOverlay]}>
+                    <View style={styles.playPlaceholder}>
+                        <Ionicons name="videocam-off" size={40} color="rgba(255,255,255,0.4)" />
+                    </View>
+                    <Text style={styles.comingSoonText}>CINEMA REEL COMING SOON</Text>
+                </View>
+            )}
+        </View>
       )}
 
       <LinearGradient
-        colors={["rgba(0,0,0,0.6)", "transparent", "rgba(0,0,0,0.95)"]}
+        colors={["rgba(0,0,0,0.6)", "transparent", "rgba(0,0,0,0.9)"]}
         style={styles.gradient}
       />
 
@@ -111,38 +127,46 @@ const ReelItem = ({
           </Text>
         </View>
 
-        {/* Right Side: Sidebar */}
+        {/* Right Side: Premium Sidebar */}
         <View style={styles.sidebar}>
           <TouchableOpacity 
-            style={styles.actionButton}
+            style={styles.premiumActionButton}
             onPress={handleAdd}
           >
-            <View style={[styles.addIconContainer, isAlreadySelected && styles.addedIconContainer]}>
+            <View style={[styles.premiumIconCircle, isAlreadySelected && styles.premiumIconCircleActive]}>
               <Ionicons 
                 name={isAlreadySelected ? "checkmark" : "add"} 
-                size={28} 
-                color="#fff" 
+                size={26} 
+                color={isAlreadySelected ? "#00bcd4" : "#fff"} 
               />
             </View>
-            <Text style={styles.actionLabel}>{isAlreadySelected ? "SAVED" : "ADD"}</Text>
+            <Text style={[styles.premiumActionLabel, isAlreadySelected && { color: '#00bcd4' }]}>
+                {isAlreadySelected ? "SAVED" : "ADD"}
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton} onPress={() => {
+          <TouchableOpacity style={styles.premiumActionButton} onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setIsLiked(!isLiked);
           }}>
-            <Ionicons name="heart" size={32} color={isLiked ? "#FF2D55" : "#fff"} />
-            <Text style={[styles.actionLabel, isLiked && { color: "#FF2D55" }]}>{item.likes_count || (isLiked ? 1 : 0)}</Text>
+            <View style={styles.premiumIconCircle}>
+                <Ionicons name="heart" size={24} color={isLiked ? "#FF2D55" : "#fff"} />
+            </View>
+            <Text style={[styles.premiumActionLabel, isLiked && { color: "#FF2D55" }]}>{item.likes_count || (isLiked ? 1 : 0)}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <MaterialCommunityIcons name="share" size={30} color="#fff" />
-            <Text style={styles.actionLabel}>SHARE</Text>
+          <TouchableOpacity style={styles.premiumActionButton}>
+            <View style={styles.premiumIconCircle}>
+                <MaterialCommunityIcons name="share-variant" size={22} color="#fff" />
+            </View>
+            <Text style={styles.premiumActionLabel}>SHARE</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionButton}>
-            <Ionicons name="bookmark" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>SAVE</Text>
+          <TouchableOpacity style={styles.premiumActionButton}>
+            <View style={styles.premiumIconCircle}>
+                <Ionicons name="bookmark" size={22} color="#fff" />
+            </View>
+            <Text style={styles.premiumActionLabel}>VAULT</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -382,31 +406,64 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     alignItems: "center",
-    width: 60,
+    width: 70,
   },
-  actionButton: {
+  premiumActionButton: {
     alignItems: "center",
     marginBottom: 20,
   },
-  addIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#00bcd4",
+  premiumIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 8,
-    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    marginBottom: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
-  addedIconContainer: {
-    backgroundColor: "#4CAF50",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
+  premiumIconCircleActive: {
+    backgroundColor: "rgba(0, 188, 212, 0.15)",
+    borderColor: "rgba(0, 188, 212, 0.4)",
+    borderWidth: 1.5,
   },
-  actionLabel: {
+  premiumActionLabel: {
     color: "#fff",
-    fontSize: 10,
-    fontWeight: "800",
-    marginTop: 4,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+    opacity: 0.9,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  fullImage: { ...StyleSheet.absoluteFillObject },
+  comingSoonOverlay: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  playPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  comingSoonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 2,
+    opacity: 0.8,
   },
 });

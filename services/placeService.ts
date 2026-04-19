@@ -7,25 +7,43 @@ import { ALL_PLACES } from "../constants/places";
 const normalizePlace = (p: any) => {
     if (!p) return null;
     
+    // Fallback image if missing
+    const hasOriginalImage = !!p.image;
+    const finalImage = hasOriginalImage ? p.image : require("../PlaceDB/Images/coming-soon.png");
+
     // Generate media array from local fields if not already present
     const media: any[] = [];
-    if (p.image) media.push({ url: p.image, media_type: 'image', is_primary: true });
-    if (p.video) media.push({ url: p.video, media_type: 'video', is_primary: true });
-    if (p.gallery) {
+    media.push({ 
+        url: finalImage, 
+        media_type: 'image', 
+        is_primary: true,
+        isPlaceholder: !hasOriginalImage 
+    });
+
+    if (p.video) {
+        media.push({ url: p.video, media_type: 'video', is_primary: true });
+    }
+    
+    if (p.gallery && p.gallery.length > 0) {
         p.gallery.forEach((g: any) => media.push({ url: g, media_type: 'image', is_primary: false }));
     }
 
+    const description = p.description || p.description_full || "";
+
     return {
         ...p,
-        place_media: media.length > 0 ? media : (p.place_media || []),
+        image: finalImage,
+        isMissingMedia: !hasOriginalImage,
+        hasVideo: !!p.video,
+        place_media: media,
         // Ensure lat/lng are top-level for the unified coordinate system
         lat: p.lat || p.coordinates?.latitude,
         lng: p.lng || p.coordinates?.longitude,
         location_display: p.location || p.location_display,
-        description_full: p.description || p.description_full,
-        description_short: (p.description || p.description_full)?.length > 50 
-            ? (p.description || p.description_full).substring(0, 50) + '...' 
-            : (p.description || p.description_full)
+        description_full: description,
+        description_short: p.description_short || (description.length > 50 
+            ? description.substring(0, 50) + '...' 
+            : description)
     };
 };
 
