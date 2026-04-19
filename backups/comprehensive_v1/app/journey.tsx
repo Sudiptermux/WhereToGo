@@ -21,7 +21,7 @@ const { width } = Dimensions.get("window");
 
 export default function JourneyScreen() {
   const router = useRouter();
-  const { optimizedJourney, visitedPlaces, toggleVisited, stayLocation, saveActiveTrip, userProfile } = useTrip();
+  const { optimizedJourney, visitedPlaces, toggleVisited, stayLocation, saveActiveTrip } = useTrip();
   const [activeDay, setActiveDay] = useState(1);
 
   const currentDayPlan = optimizedJourney.find(d => d.day === activeDay) || { day: 1, places: [] };
@@ -52,15 +52,9 @@ export default function JourneyScreen() {
                     <Ionicons name="close" size={28} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Active Journey</Text>
-                <TouchableOpacity style={styles.avatarContainer} onPress={() => router.push("/(tabs)/profile")}>
-                    {userProfile.avatar ? (
-                        <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
-                    ) : (
-                        <View style={[styles.avatar, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Ionicons name="person" size={20} color="rgba(255,255,255,0.3)" />
-                        </View>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.avatarContainer}>
+                    <Image source={{ uri: "https://i.pravatar.cc/100?u=unik" }} style={styles.avatar} />
+                </View>
             </View>
 
             <View style={styles.progressContainer}>
@@ -321,7 +315,7 @@ const styles = StyleSheet.create({
   },
   waypointContainer: {
     flexDirection: "row",
-    minHeight: 140, // Increased for better spacing
+    minHeight: 110,
   },
   connectorContainer: {
     width: 40,
@@ -346,7 +340,7 @@ const styles = StyleSheet.create({
   },
   endNode: {
     backgroundColor: "#fff",
-    borderColor: "rgba(255,152,0,0.2)",
+    borderColor: "rgba(255,255,255,0.2)",
   },
   nodeIndex: {
     color: "#444",
@@ -428,34 +422,35 @@ const styles = StyleSheet.create({
   },
   transitIndicator: {
     position: 'absolute',
-    top: -95, // Shifted much higher up the line
+    top: -45,
     left: 0,
     right: 0,
     alignItems: 'center',
     height: 40,
-    zIndex: 5, // Higher to ensure visibility
-    justifyContent: 'center',
+    zIndex: 1,
   },
   transitLine: {
     width: 1,
     height: '100%',
-    backgroundColor: 'transparent', // Hide internal line, let external line show
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   transitLabel: {
+    position: 'absolute',
+    top: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#121212', // Slightly matched to cards for premium feel
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    backgroundColor: '#060606',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   transitText: {
     color: '#00bcd4',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
-    marginLeft: 5,
+    marginLeft: 4,
     letterSpacing: 0.5,
   },
   timeBadge: {

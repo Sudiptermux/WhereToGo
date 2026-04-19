@@ -19,13 +19,12 @@ import Animated, {
 import { useTrip, Place } from "../context/TripContext";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { optimizeRoute } from "../services/routeEngine";
 
 const { width } = Dimensions.get("window");
 
 export default function OptimizationLoaderScreen() {
   const router = useRouter();
-  const { selectedPlaces, stayLocation, numberOfDays, setOptimizedJourney } = useTrip();
+  const { selectedPlaces, numberOfDays, setOptimizedJourney } = useTrip();
   
   const [statusIndex, setStatusIndex] = useState(0);
   const [percent, setPercent] = useState(0);
@@ -37,18 +36,18 @@ export default function OptimizationLoaderScreen() {
 
   const statuses = [
     "Analyzing local transit patterns",
-    "Calculating Haversine distances",
-    "Optimizing Clarke-Wright savings",
-    "Validating destination time windows",
+    "Consolidating global travel data",
+    "Optimizing multi-day clusters",
+    "Weighting destination proximity",
     "Refining pathfinding algorithms",
-    "Perfecting your multi-day curation",
+    "Perfecting your itinerary",
   ];
 
   useEffect(() => {
     // 1. Initial Animations
     sparkleScale.value = withRepeat(withTiming(1.2, { duration: 1200 }), -1, true);
     orbitRotation.value = withRepeat(withTiming(360, { duration: 3000, easing: Easing.linear }), -1);
-    progressWidth.value = withTiming(100, { duration: 6000 });
+    progressWidth.value = withTiming(100, { duration: 5000 });
     cardOpacity.value = withTiming(1, { duration: 800 });
 
     // 2. Percentage Ticker logic to match image
@@ -57,26 +56,43 @@ export default function OptimizationLoaderScreen() {
             if (prev < 100) return prev + 1;
             return 100;
         });
-    }, 60);
+    }, 50);
 
     // 3. Status Rotator matches the speed of optimization
     const statusInterval = setInterval(() => {
       setStatusIndex((prev) => (prev + 1) % statuses.length);
-    }, 950);
+    }, 850);
 
-    // 4. REAL LOGIC: Trigger the new Engine
+    // 4. Logic: Simulate the AI processing
+    // 4. Logic: Simulate the AI processing with clustering
     const performOptimization = () => {
-      if (selectedPlaces.length === 0) return;
-
-      const { journey, message } = optimizeRoute(selectedPlaces, stayLocation, numberOfDays);
-      setOptimizedJourney(journey);
-      
-      if (message) {
-        console.log("[Engine Notice]:", message);
-        // We could show this message in the UI eventually
+      if (selectedPlaces.length === 0) {
+        // Handle empty case in navigation timer
+        return;
       }
+
+      const placesCopy = [...selectedPlaces];
+      
+      // Better Clustering Logic: Group by location if possible
+      const groups: { [key: string]: Place[] } = {};
+      placesCopy.forEach(p => {
+        const city = p.location || p.location_display || "Other";
+        if (!groups[city]) groups[city] = [];
+        groups[city].push(p);
+      });
+
+      const dayList = Object.values(groups);
+      const journey = [];
+
+      // If we have more locations than days, we merge or split.
+      // For demo, we just map cities to days.
+      for (let i = 0; i < (numberOfDays || 1); i++) {
+          const dayPlaces = dayList[i % dayList.length] || [];
+          journey.push({ day: i + 1, places: dayPlaces });
+      }
+      
+      setOptimizedJourney(journey);
     };
-    
     performOptimization();
 
     // 5. Navigate
@@ -87,7 +103,7 @@ export default function OptimizationLoaderScreen() {
         return;
       }
       router.replace("/summary");
-    }, 6500);
+    }, 5500);
 
     return () => {
       clearInterval(interval);

@@ -17,7 +17,7 @@ import { useRouter } from "expo-router";
 const { width } = Dimensions.get("window");
 
 export default function SavedScreen() {
-  const { savedTrips, loadSavedTrip, likedPlaces, toggleLike } = useTrip();
+  const { savedTrips, loadSavedTrip } = useTrip();
   const router = useRouter();
 
   const getSource = (src: any) => typeof src === 'number' ? src : { uri: src };
@@ -51,42 +51,6 @@ export default function SavedScreen() {
           <Text style={styles.eyebrow}>YOUR CURATION</Text>
           <Text style={styles.mainTitle}>Upcoming & Past Journeys</Text>
         </View>
-
-        {/* My Wishlist Section */}
-        {likedPlaces.length > 0 && (
-          <View style={styles.wishlistSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionEyebrow}>MY WISHLIST</Text>
-              <Text style={styles.sectionCount}>{likedPlaces.length} locations</Text>
-            </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.wishlistScroll}
-            >
-              {likedPlaces.map((place) => (
-                <TouchableOpacity 
-                  key={place.id} 
-                  style={styles.wishlistCard}
-                  onPress={() => router.push({ pathname: "/details", params: { id: place.id } })}
-                >
-                  <Image source={getSource(place.image)} style={styles.wishlistImage} />
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.8)"]}
-                    style={styles.wishlistGradient}
-                  />
-                  <TouchableOpacity 
-                    style={styles.removeBtn}
-                    onPress={() => toggleLike(place)}
-                  >
-                    <Ionicons name="close" size={16} color="#fff" />
-                  </TouchableOpacity>
-                  <Text style={styles.wishlistTitle} numberOfLines={1}>{place.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
 
         {/* Trips List */}
         <View style={styles.tripsList}>
@@ -201,74 +165,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 34,
-  },
-  wishlistSection: {
-    marginBottom: 40,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 15,
-  },
-  sectionEyebrow: {
-    color: "#00bcd4",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  sectionCount: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  wishlistScroll: {
-    paddingLeft: 20,
-    paddingRight: 10,
-  },
-  wishlistCard: {
-    width: 140,
-    height: 180,
-    borderRadius: 20,
-    marginRight: 15,
-    backgroundColor: "#121212",
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-  },
-  wishlistImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  wishlistGradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  removeBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  wishlistTitle: {
-    position: "absolute",
-    bottom: 12,
-    left: 12,
-    right: 12,
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "800",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   tripsList: {
     paddingHorizontal: 20,

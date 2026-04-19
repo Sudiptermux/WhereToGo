@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useState, ReactNode } from "react";
 
 export type Place = {
   id: string;
@@ -18,9 +17,6 @@ export type Place = {
     latitude: number;
     longitude: number;
   };
-  arrivalTime?: string;
-  departureTime?: string;
-  travelTimeMinutes?: number;
 };
 
 export type SavedTrip = {
@@ -30,37 +26,17 @@ export type SavedTrip = {
   status: 'COMPLETE' | 'DRAFT';
   statusColor: string;
   image: any;
-  days: { 
-    day: number; 
-    places: Place[]; 
-    totalDistanceKm?: number;
-    estimatedDurationMins?: number;
-    startTime?: string;
-    endTime?: string;
-  }[];
+  days: { day: number; places: Place[] }[];
   stayLocation: Place | null;
   dateCreated: string;
   visitedPlaces: string[];
-};
-
-export type UserProfile = {
-  name: string;
-  avatar: string | null;
-  level: number;
 };
 
 interface TripContextType {
   selectedPlaces: Place[];
   stayLocation: Place | null;
   numberOfDays: number;
-  optimizedJourney: { 
-    day: number; 
-    places: Place[];
-    totalDistanceKm?: number;
-    estimatedDurationMins?: number;
-    startTime?: string;
-    endTime?: string;
-  }[];
+  optimizedJourney: { day: number; places: Place[] }[];
   visitedPlaces: string[];
   savedTrips: SavedTrip[];
   activeTripId: string | null;
@@ -68,25 +44,12 @@ interface TripContextType {
   removeFromTrip: (id: string) => void;
   setStayLocation: (place: Place | null) => void;
   setNumberOfDays: (days: number) => void;
-  setOptimizedJourney: (journey: { 
-    day: number; 
-    places: Place[];
-    totalDistanceKm?: number;
-    estimatedDurationMins?: number;
-    startTime?: string;
-    endTime?: string;
-    finalTransitMinutes?: number;
-  }[]) => void;
-  likedPlaces: Place[];
+  setOptimizedJourney: (journey: { day: number; places: Place[] }[]) => void;
   toggleVisited: (id: string) => void;
-  toggleLike: (place: Place) => void;
-  isLiked: (id: string) => boolean;
   saveActiveTrip: () => void;
   loadSavedTrip: (trip: SavedTrip) => void;
   clearTrip: () => void;
   isPlaceSelected: (id: string) => boolean;
-  userProfile: UserProfile;
-  updateProfile: (updates: Partial<UserProfile>) => void;
 }
 
 const TripContext = createContext<TripContextType | undefined>(undefined);
@@ -95,47 +58,10 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const [selectedPlaces, setSelectedPlaces] = useState<Place[]>([]);
   const [stayLocation, setStayLocation] = useState<Place | null>(null);
   const [numberOfDays, setNumberOfDays] = useState<number>(3);
-  const [optimizedJourney, setOptimizedJourney] = useState<{ 
-    day: number; 
-    places: Place[];
-    totalDistanceKm?: number;
-    estimatedDurationMins?: number;
-    startTime?: string;
-    endTime?: string;
-    finalTransitMinutes?: number;
-  }[]>([]);
+  const [optimizedJourney, setOptimizedJourney] = useState<{ day: number; places: Place[] }[]>([]);
   const [visitedPlaces, setVisitedPlaces] = useState<string[]>([]);
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
-  const [likedPlaces, setLikedPlaces] = useState<Place[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: "Demo Traveler",
-    avatar: null,
-    level: 1
-  });
-
-  // Load profile from storage on mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const saved = await AsyncStorage.getItem("@wtg_user_profile");
-        if (saved) setUserProfile(JSON.parse(saved));
-      } catch (e) {
-        console.log("Failed to load profile", e);
-      }
-    };
-    loadData();
-  }, []);
-
-  const updateProfile = async (updates: Partial<UserProfile>) => {
-    const newProfile = { ...userProfile, ...updates };
-    setUserProfile(newProfile);
-    try {
-      await AsyncStorage.setItem("@wtg_user_profile", JSON.stringify(newProfile));
-    } catch (e) {
-      console.log("Failed to save profile", e);
-    }
-  };
 
   const addToTrip = (place: Place) => {
     setSelectedPlaces((prev) => {
@@ -147,19 +73,6 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const removeFromTrip = (id: string) => {
     setSelectedPlaces((prev) => prev.filter((p) => p.id !== id));
     setVisitedPlaces((prev) => prev.filter((pid) => pid !== id));
-  };
-
-  const toggleLike = (place: Place) => {
-    setLikedPlaces((prev) => {
-      if (prev.find((p) => p.id === place.id)) {
-        return prev.filter(p => p.id !== place.id);
-      }
-      return [...prev, place];
-    });
-  };
-
-  const isLiked = (id: string) => {
-    return likedPlaces.some(p => p.id === id);
   };
 
   const toggleVisited = (id: string) => {
@@ -249,15 +162,10 @@ export function TripProvider({ children }: { children: ReactNode }) {
         setNumberOfDays,
         setOptimizedJourney,
         toggleVisited,
-        likedPlaces,
-        toggleLike,
-        isLiked,
         saveActiveTrip,
         loadSavedTrip,
         clearTrip,
         isPlaceSelected,
-        userProfile,
-        updateProfile,
       }}
     >
       {children}

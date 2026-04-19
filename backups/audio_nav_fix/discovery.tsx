@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, memo, useCallback } from "react";
+import React, { useEffect, useState, useRef, memo } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip, Place } from "../context/TripContext";
 import { placeService } from "../services/placeService";
@@ -24,25 +24,20 @@ const { width, height } = Dimensions.get("window");
 const ReelItem = memo(({ 
     item, 
     addToTrip, 
-    removeFromTrip,
     isActive,
     isAlreadySelected,
     sharedPlayer,
-    videoSource,
-    isLiked,
-    toggleLike,
+    videoSource
 }: { 
     item: Place; 
     addToTrip: (item: any) => void;
-    removeFromTrip: (id: string) => void;
     isActive: boolean;
     isAlreadySelected: boolean;
     sharedPlayer: any;
     videoSource: any;
-    isLiked: boolean;
-    toggleLike: (item: any) => void;
 }) => {
   const router = useRouter();
+  const [isLiked, setIsLiked] = useState(false);
 
   const getSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
@@ -127,12 +122,12 @@ const ReelItem = memo(({
 
           <TouchableOpacity style={styles.premiumActionButton} onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              toggleLike(item);
+              setIsLiked(!isLiked);
           }}>
             <View style={styles.premiumIconCircle}>
-                <Ionicons name={isLiked ? "heart" : "heart-outline"} size={24} color={isLiked ? "#FF2D55" : "#fff"} />
+                <Ionicons name="heart" size={24} color={isLiked ? "#FF2D55" : "#fff"} />
             </View>
-            <Text style={[styles.premiumActionLabel, isLiked && { color: "#FF2D55" }]}>{isLiked ? "WISHLIST" : "LIKE"}</Text>
+            <Text style={[styles.premiumActionLabel, isLiked && { color: "#FF2D55" }]}>{item.likes_count || (isLiked ? 1 : 0)}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.premiumActionButton}>
@@ -157,7 +152,7 @@ const ReelItem = memo(({
 export default function DiscoveryScreen() {
   const router = useRouter();
   const { area, placeId } = useLocalSearchParams();
-  const { addToTrip, removeFromTrip, selectedPlaces, isPlaceSelected, toggleLike, isLiked } = useTrip();
+  const { addToTrip, removeFromTrip, selectedPlaces, isPlaceSelected } = useTrip();
   const [places, setPlaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -168,25 +163,6 @@ export default function DiscoveryScreen() {
     p.muted = false; // Always unmuted when playing active
     console.log("[WhereToGo] High-Performance Player Engine Initialized");
   });
-
-  // AUDIO AUTO-STOP Logic: Ensuring global silence when leaving the feed
-  useFocusEffect(
-    useCallback(() => {
-      // When screen is focused, we don't need to do anything special here.
-      return () => {
-        // Use a safety check and try-catch to prevent crashes if native object is released
-        try {
-          if (sharedPlayer) {
-            console.log("[Discovery] User left screen - Pausing playback");
-            sharedPlayer.pause();
-            sharedPlayer.muted = true;
-          }
-        } catch (error) {
-          console.log("[Discovery] Player already released or invalid:", error);
-        }
-      };
-    }, [sharedPlayer])
-  );
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 80 // Higher threshold for more "intentional" snaps
@@ -204,11 +180,7 @@ export default function DiscoveryScreen() {
           sharedPlayer.replace(normalizedSource);
           sharedPlayer.play();
       } else {
-          try {
-            if (sharedPlayer) sharedPlayer.pause();
-          } catch (e) {
-            console.log("[Discovery] Could not pause player:", e);
-          }
+          sharedPlayer.pause();
       }
     }
   }).current;
@@ -266,13 +238,10 @@ export default function DiscoveryScreen() {
           <ReelItem 
             item={item} 
             addToTrip={addToTrip} 
-            removeFromTrip={removeFromTrip}
             isActive={item.id === activeId} 
             isAlreadySelected={isPlaceSelected(item.id)}
             sharedPlayer={sharedPlayer}
             videoSource={item.video || item.place_media?.find((m: any) => m.media_type === 'video')?.url}
-            isLiked={isLiked(item.id)}
-            toggleLike={toggleLike}
           />
         )}
         keyExtractor={(item) => item.id}

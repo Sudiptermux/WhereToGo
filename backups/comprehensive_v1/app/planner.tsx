@@ -24,7 +24,7 @@ const { width, height } = Dimensions.get("window");
 
 export default function RoutePlannerScreen() {
   const router = useRouter();
-  const { selectedPlaces, removeFromTrip, stayLocation, setStayLocation, numberOfDays, setNumberOfDays, userProfile } = useTrip();
+  const { selectedPlaces, removeFromTrip, stayLocation, setStayLocation, numberOfDays, setNumberOfDays } = useTrip();
   
   const [showStayHub, setShowStayHub] = useState(false);
   const [isMapPicking, setIsMapPicking] = useState(false);
@@ -70,30 +70,6 @@ export default function RoutePlannerScreen() {
       setIsSearching(false);
     }
   };
-
-  useEffect(() => {
-    if (mapRef.current && (selectedPlaces.length > 0 || stayLocation)) {
-      const coords = [
-        ...(stayLocation ? [{ 
-          latitude: stayLocation.lat || stayLocation.coordinates?.latitude || INITIAL_REGION.latitude,
-          longitude: stayLocation.lng || stayLocation.coordinates?.longitude || INITIAL_REGION.longitude 
-        }] : []),
-        ...selectedPlaces.map(p => ({
-          latitude: p.lat || p.coordinates?.latitude || INITIAL_REGION.latitude,
-          longitude: p.lng || p.coordinates?.longitude || INITIAL_REGION.longitude
-        }))
-      ];
-      if (coords.length > 0) {
-        setTimeout(() => {
-          mapRef.current?.fitToCoordinates(coords, {
-            edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-            animated: true,
-          });
-        }, 500);
-      }
-    }
-  }, [selectedPlaces, stayLocation, isMapExpanded]);
-
 
   const handleSelectHotel = (hotel: any) => {
     setStayLocation({
@@ -192,15 +168,10 @@ export default function RoutePlannerScreen() {
             <TouchableOpacity style={styles.headerIcon}>
                 <Ionicons name="notifications-outline" size={24} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
-                {userProfile.avatar ? (
-                    <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
-                ) : (
-                    <View style={[styles.avatar, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="person" size={20} color="rgba(255,255,255,0.3)" />
-                    </View>
-                )}
-            </TouchableOpacity>
+            <Image 
+                source={{ uri: "https://i.pravatar.cc/100?u=unik" }} 
+                style={styles.avatar}
+            />
           </View>
         </View>
       </SafeAreaView>
@@ -358,7 +329,6 @@ export default function RoutePlannerScreen() {
             </View>
             <View style={[styles.mapFrame, { height: isMapExpanded ? 450 : 150 }]}>
                 <MapView
-                    ref={mapRef}
                     provider={PROVIDER_GOOGLE}
                     style={styles.miniMap}
                     initialRegion={INITIAL_REGION}

@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
     Image,
     SafeAreaView,
@@ -8,282 +8,443 @@ import {
     Text,
     TouchableOpacity,
     View,
-    ActivityIndicator,
+    Alert,
+    Dimensions,
 } from "react-native";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { getUserAttributes } from "../../services/authService";
+import { useTrip } from "../../context/TripContext";
+import * as ImagePicker from 'expo-image-picker';
+
+const { width } = Dimensions.get("window");
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { userProfile, updateProfile, savedTrips, visitedPlaces, likedPlaces } = useTrip();
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(userProfile.name);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const attrs = await getUserAttributes();
-        setUserData(attrs);
-      } catch (error) {
-        console.log("Error fetching user stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
+  const stats = {
+    trips: savedTrips.length,
+    stops: visitedPlaces.length,
+    wishlist: likedPlaces.length,
+    distance: savedTrips.reduce((acc, t) => acc + (t.days.reduce((dAcc, d) => dAcc + (d.totalDistanceKm || 0), 0)), 0).toFixed(0)
+  };
+
+  const getPersona = () => {
+    if (likedPlaces.length === 0) return "New Explorer";
+    const keywords = likedPlaces.map(p => (p.description_full || '') + p.title).join(' ').toLowerCase();
+    if (keywords.includes('temple') || keywords.includes('heritage')) return "Cultural Custodian";
+    if (keywords.includes('park') || keywords.includes('wildlife') || keywords.includes('forest')) return "Nature Nomad";
+    return "Voyager";
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      updateProfile({ avatar: result.assets[0].uri });
+    }
+  };
 
   const onLogout = () => {
-    // TODO: clear auth session
     router.replace("/");
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-            <TouchableOpacity>
-                <Feather name="menu" size={24} color="#00bcd4" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>WhereToGo</Text>
-            <TouchableOpacity>
-                <Ionicons name="settings-sharp" size={24} color="#8e9e9f" />
-            </TouchableOpacity>
+        {/* Cinematic Header Card */}
+        <View style={styles.heroSection}>
+            <LinearGradient
+                colors={["#00bcd4", "#4facfe"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroGradient}
+            />
+            <SafeAreaView style={styles.safeHeader}>
+                <View style={styles.headerTop}>
+                    <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
+                        <Feather name="chevron-left" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerLabel}>DIGITAL IDENTITY</Text>
+                    <TouchableOpacity style={styles.headerBtn}>
+                        <Ionicons name="settings-outline" size={22} color="#fff" />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.profileMain}>
+                    <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
+                        <View style={styles.avatarRing}>
+                            {userProfile.avatar ? (
+                                <Image source={{ uri: userProfile.avatar }} style={styles.avatarImg} />
+                            ) : (
+                                <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
+                                    <Ionicons name="person" size={40} color="rgba(255,255,255,0.3)" />
+                                </View>
+                            )}
+                            <View style={styles.editPicBtn}>
+                                <Ionicons name="camera" size={14} color="#fff" />
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+
+                    <View style={styles.nameSection}>
+                        <View style={styles.nameRow}>
+                            <Text style={styles.userName}>{userProfile.name}</Text>
+                            <TouchableOpacity style={styles.miniEditBtn} onPress={() => {
+                                Alert.prompt("Edit Name", "Enter your new explorer name", (text) => {
+                                    if (text) updateProfile({ name: text });
+                                });
+                            }}>
+                                <Feather name="edit-3" size={16} color="rgba(255,255,255,0.6)" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.personaBadge}>
+                            <Text style={styles.personaText}>{getPersona().toUpperCase()}</Text>
+                        </View>
+                    </View>
+                </View>
+            </SafeAreaView>
         </View>
 
-        {/* Profile Info */}
-        <View style={styles.profileInfo}>
-          <View style={styles.avatarWrapper}>
-            <View style={styles.avatarNeonBorder}>
-                <Image
-                    source={{ uri: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400" }}
-                    style={styles.avatar}
-                />
-                <View style={styles.verifiedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#00bcd4" />
+        {/* Curator Dashboard */}
+        <View style={styles.dashboard}>
+            <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{stats.trips}</Text>
+                    <Text style={styles.statDesc}>JOURNEYS</Text>
+                </View>
+                <View style={[styles.statItem, styles.statBorder]}>
+                    <Text style={styles.statNum}>{stats.stops}</Text>
+                    <Text style={styles.statDesc}>STOPS</Text>
+                </View>
+                <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{stats.wishlist}</Text>
+                    <Text style={styles.statDesc}>WISHES</Text>
                 </View>
             </View>
-          </View>
-          <Text style={styles.name}>{loading ? "..." : (userData?.name || "Explorer")}</Text>
-          
-          <View style={styles.proBadge}>
-             <Ionicons name="star" size={14} color="#c27d14" />
-             <Text style={styles.proBadgeText}>PRO EXPLORER</Text>
-          </View>
+
+            <LinearGradient colors={["#121212", "#080808"]} style={styles.mileageCard}>
+                <View style={styles.mileageInfo}>
+                    <Text style={styles.mileageLabel}>TOTAL AIRTIME</Text>
+                    <Text style={styles.mileageValue}>{stats.distance} <Text style={styles.kmUnit}>KM</Text></Text>
+                </View>
+                <View style={styles.mileageIcon}>
+                    <MaterialCommunityIcons name="map-marker-distance" size={32} color="#00bcd4" />
+                </View>
+            </LinearGradient>
         </View>
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>12</Text>
-            <Text style={styles.statLabel}>TRIPS</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>45</Text>
-            <Text style={styles.statLabel}>PLACES</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>Lvl 8</Text>
-            <Text style={styles.statLabel}>STATUS</Text>
-          </View>
-        </View>
-
-        {/* Account Management Section */}
+        {/* Achievements Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACCOUNT MANAGEMENT</Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconBox}>
-                <Ionicons name="settings-sharp" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Settings</Text>
-            <Feather name="chevron-right" size={20} color="#333" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconBox}>
-                <MaterialCommunityIcons name="tune-variant" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Preferences</Text>
-            <Feather name="chevron-right" size={20} color="#333" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconBox}>
-                <Ionicons name="card-sharp" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Payment Methods</Text>
-            <Feather name="chevron-right" size={20} color="#333" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuIconBox}>
-                <Ionicons name="help-circle" size={20} color="#fff" />
-            </View>
-            <Text style={styles.menuText}>Help & Support</Text>
-            <Feather name="chevron-right" size={20} color="#333" />
-          </TouchableOpacity>
+            <Text style={styles.sectionHeader}>CURATOR MILESTONES</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesScroll}>
+                <View style={styles.badgeCard}>
+                    <View style={[styles.badgeIcon, { backgroundColor: 'rgba(0,188,212,0.1)' }]}>
+                        <Ionicons name="flash" size={24} color="#00bcd4" />
+                    </View>
+                    <Text style={styles.badgeName}>First Spark</Text>
+                </View>
+                <View style={styles.badgeCard}>
+                    <View style={[styles.badgeIcon, { backgroundColor: 'rgba(255,152,0,0.1)' }]}>
+                        <Ionicons name="shield-checkmark" size={24} color="#ff9800" />
+                    </View>
+                    <Text style={styles.badgeName}>City Legend</Text>
+                </View>
+                <View style={styles.badgeCard}>
+                    <View style={[styles.badgeIcon, { backgroundColor: 'rgba(156,39,176,0.1)' }]}>
+                        <Ionicons name="heart" size={24} color="#9c27b0" />
+                    </View>
+                    <Text style={styles.badgeName}>Heart Seeker</Text>
+                </View>
+            </ScrollView>
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={onLogout}
-        >
-          <Ionicons name="log-out" size={22} color="#c27d14" />
-          <Text style={styles.logoutText}>LOGOUT</Text>
-        </TouchableOpacity>
+        {/* Account Options */}
+        <View style={styles.section}>
+            <Text style={styles.sectionHeader}>PREFERENCES</Text>
+            <TouchableOpacity style={styles.actionRow}>
+                <View style={styles.actionLeft}>
+                    <View style={styles.actionIconBox}>
+                        <Feather name="bell" size={18} color="#8e9e9f" />
+                    </View>
+                    <Text style={styles.actionText}>Notifications</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color="#333" />
+            </TouchableOpacity>
 
-        <View style={{ height: 60 }} />
+            <TouchableOpacity style={styles.actionRow}>
+                <View style={styles.actionLeft}>
+                    <View style={styles.actionIconBox}>
+                        <Feather name="globe" size={18} color="#8e9e9f" />
+                    </View>
+                    <Text style={styles.actionText}>Language</Text>
+                </View>
+                <Text style={styles.actionValue}>English</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.actionRow, styles.logoutAction]} onPress={onLogout}>
+                <View style={styles.actionLeft}>
+                    <View style={[styles.actionIconBox, { backgroundColor: 'rgba(255,45,85,0.1)' }]}>
+                        <Ionicons name="log-out" size={18} color="#FF2D55" />
+                    </View>
+                    <Text style={[styles.actionText, { color: '#FF2D55' }]}>Logout Session</Text>
+                </View>
+            </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#060606" },
-  content: { padding: 20 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 10,
+  content: { flexGrow: 1 },
+  heroSection: {
+    height: 380,
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.15,
+  },
+  safeHeader: {
+    flex: 1,
+    paddingHorizontal: 25,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
     marginBottom: 40,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#00bcd4",
+  headerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  profileInfo: {
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  avatarWrapper: {
-    marginBottom: 20,
-  },
-  avatarNeonBorder: {
-    width: 140,
-    height: 140,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: "rgba(0, 188, 212, 0.4)",
-    padding: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#00bcd4",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-  },
-  avatar: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
-  },
-  verifiedBadge: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "#060606",
-    borderRadius: 10,
-  },
-  name: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#fff",
-    marginBottom: 10,
-  },
-  proBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(194, 125, 20, 0.1)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(194, 125, 20, 0.2)",
-  },
-  proBadgeText: {
-    color: "#c27d14",
+  headerLabel: {
+    color: '#fff',
     fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginLeft: 6,
+    fontWeight: '900',
+    letterSpacing: 2,
+    opacity: 0.6,
   },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 50,
+  profileMain: {
+    alignItems: 'center',
   },
-  statBox: {
-    backgroundColor: "#121212",
-    borderRadius: 16,
-    paddingVertical: 20,
-    width: "31%",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#1a1a1a",
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#fff",
-  },
-  statLabel: {
-    fontSize: 11,
-    color: "#8e9e9f",
-    fontWeight: "700",
-    marginTop: 6,
-    letterSpacing: 0.5,
-  },
-  section: {
-    marginBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#8e9e9f",
+  avatarContainer: {
     marginBottom: 20,
+  },
+  avatarRing: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    padding: 5,
+    backgroundColor: 'rgba(0,188,212,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImg: {
+    width: 115,
+    height: 115,
+    borderRadius: 57.5,
+    backgroundColor: '#1a1a1a',
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editPicBtn: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#00bcd4',
+    borderWidth: 3,
+    borderColor: '#060606',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nameSection: {
+    alignItems: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  userName: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#fff',
+    marginRight: 10,
+  },
+  miniEditBtn: {
+    padding: 5,
+  },
+  personaBadge: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  personaText: {
+    color: '#00bcd4',
+    fontSize: 11,
+    fontWeight: '800',
     letterSpacing: 1.5,
   },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#121212",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1a1a1a",
+  dashboard: {
+    paddingHorizontal: 25,
+    marginTop: -40,
   },
-  menuIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#1a1a1a",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
-  menuText: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+  statsGrid: {
+    flexDirection: 'row',
+    backgroundColor: '#161616',
+    borderRadius: 25,
     padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 15,
   },
-  logoutText: {
-    color: "#c27d14",
-    fontSize: 18,
-    fontWeight: "800",
-    marginLeft: 10,
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statBorder: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  statNum: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  statDesc: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 4,
     letterSpacing: 1,
   },
+  mileageCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(0,188,212,0.15)',
+  },
+  mileageLabel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+  mileageValue: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '900',
+  },
+  kmUnit: {
+    fontSize: 14,
+    color: '#00bcd4',
+    opacity: 0.8,
+  },
+  section: {
+    marginTop: 40,
+    paddingHorizontal: 25,
+  },
+  sectionHeader: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 20,
+    opacity: 0.6,
+  },
+  badgesScroll: {
+    paddingRight: 20,
+  },
+  badgeCard: {
+    width: 100,
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  badgeIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  badgeName: {
+    color: '#8e9e9f',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+    padding: 18,
+    borderRadius: 20,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  actionValue: {
+    color: '#8e9e9f',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  logoutAction: {
+    marginTop: 10,
+    borderColor: 'rgba(255,45,85,0.1)',
+  },
 });
+

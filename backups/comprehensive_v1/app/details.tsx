@@ -18,14 +18,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTrip } from "../context/TripContext";
 import { placeService } from "../services/placeService";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 
 const { width, height } = Dimensions.get("window");
 
 export default function PlaceDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { addToTrip, selectedPlaces, toggleLike, isLiked } = useTrip();
+  const { addToTrip, selectedPlaces } = useTrip();
   const [place, setPlace] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -225,18 +224,8 @@ export default function PlaceDetailsScreen() {
       <View style={styles.footer}>
         <LinearGradient colors={["transparent", "rgba(6,6,6,0.9)", "#060606"]} style={styles.footerGradient}>
            <View style={styles.footerActions}>
-                <TouchableOpacity 
-                    style={[styles.saveBtn, isLiked(place.id) && styles.likedBtn]} 
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        toggleLike(place);
-                    }}
-                >
-                    <Ionicons 
-                        name={isLiked(place.id) ? "heart" : "heart-outline"} 
-                        size={24} 
-                        color={isLiked(place.id) ? "#FF2D55" : "#fff"} 
-                    />
+                <TouchableOpacity style={styles.saveBtn}>
+                    <Ionicons name="bookmark-outline" size={24} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={[styles.primaryBtn, isSelected && styles.addedBtn]}
@@ -387,7 +376,6 @@ const styles = StyleSheet.create({
   footerGradient: { flex: 1, justifyContent: "flex-end", paddingBottom: 30, paddingHorizontal: 24 },
   footerActions: { flexDirection: "row", alignItems: "center" },
   saveBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center", marginRight: 15, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  likedBtn: { borderColor: "rgba(255, 45, 85, 0.3)", backgroundColor: "rgba(255, 45, 85, 0.1)" },
   primaryBtn: { flex: 1, height: 60, borderRadius: 30, backgroundColor: "#00bcd4", flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#00bcd4", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 },
   addedBtn: { backgroundColor: "rgba(0,188,212,0.1)", borderWidth: 1, borderColor: "#00bcd4", shadowOpacity: 0 },
   primaryBtnText: { color: "#000", fontSize: 15, fontWeight: "900", marginLeft: 10 },

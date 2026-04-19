@@ -17,13 +17,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { placeService } from "../../services/placeService";
-import { useTrip } from "../../context/TripContext";
 
 const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { userProfile } = useTrip();
   const [searchText, setSearchText] = useState("");
   const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
   const [trendingPlaces, setTrendingPlaces] = useState<any[]>([]);
@@ -139,14 +137,11 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.brandTitle}>WhereToGo</Text>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
-            {userProfile.avatar ? (
-                <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
-            ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={20} color="rgba(255,255,255,0.3)" />
-                </View>
-            )}
+          <TouchableOpacity onPress={() => router.push("/profile")}>
+            <Image
+              source={{ uri: "https://randomuser.me/api/portraits/men/32.jpg" }}
+              style={styles.avatar}
+            />
           </TouchableOpacity>
         </View>
 
@@ -253,14 +248,10 @@ const styles = StyleSheet.create({
   avatar: {
     width: 42,
     height: 42,
-    borderRadius: 14,
-    backgroundColor: "#1a1a1a",
+    borderRadius: 21,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  avatarPlaceholder: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
   searchContainer: {
     paddingHorizontal: 20,
     marginBottom: 30,
