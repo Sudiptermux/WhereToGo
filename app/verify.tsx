@@ -1,14 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
+    View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { confirmSignUp, resendConfirmationCode } from "../services/authService";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -60,20 +62,27 @@ export default function VerifyScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.iconCircle}>
+          <Ionicons name="mail-open" size={32} color="#081a2e" />
+        </View>
+
         <Text style={styles.heading}>Email Verification</Text>
         <Text style={styles.subheading}>
-          Enter the code we sent to your email
+          Enter the 6-digit code we sent to your email address.
         </Text>
 
-        <TextInput
-          style={styles.input}
-          value={code}
-          onChangeText={setCode}
-          placeholder="Verification code"
-          keyboardType="number-pad"
-          maxLength={6}
-        />
+        <View style={styles.inputWrapper}>
+            <TextInput
+            style={styles.input}
+            value={code}
+            onChangeText={setCode}
+            placeholder="000 000"
+            placeholderTextColor="#444"
+            keyboardType="number-pad"
+            maxLength={6}
+            />
+        </View>
 
         <TouchableOpacity
           style={[
@@ -84,12 +93,17 @@ export default function VerifyScreen() {
           disabled={loading}
         >
           <Text style={styles.primaryText}>
-            {loading ? "Verifying..." : "Verify"}
+            {loading ? "VERIFYING..." : "VERIFY CODE"}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.linkButton} onPress={onResend}>
-          <Text style={styles.linkText}>Resend code</Text>
+          <Text style={styles.linkText}>Didn't receive code? <Text style={styles.cta}>Resend</Text></Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color="#8e9e9f" />
+            <Text style={styles.backText}>Back to Signup</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -97,30 +111,80 @@ export default function VerifyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#e8f1f2" },
-  content: { padding: 20 },
-  heading: { fontSize: 28, fontWeight: "700", marginTop: 20, marginBottom: 8 },
-  subheading: { color: "#6c8b8e", marginBottom: 20 },
+  container: { flex: 1, backgroundColor: "#060606" },
+  content: { padding: 30, alignItems: "center" },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: "#00bcd4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 60,
+    marginBottom: 30,
+    shadowColor: "#00bcd4",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+  },
+  heading: { 
+    fontSize: 28, 
+    fontWeight: "800", 
+    color: "#fff",
+    marginBottom: 8 
+  },
+  subheading: { 
+    color: "#8e9e9f", 
+    marginBottom: 40,
+    textAlign: "center",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  inputWrapper: {
+    width: "100%",
+    marginBottom: 30,
+  },
   input: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    height: 50,
-    paddingHorizontal: 12,
-    marginBottom: 15,
-    elevation: 2,
+    backgroundColor: "#121212",
+    borderRadius: 18,
+    height: 65,
+    paddingHorizontal: 20,
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 10,
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
   },
   primaryButton: {
     backgroundColor: "#00bcd4",
-    borderRadius: 14,
-    height: 52,
+    borderRadius: 20,
+    width: "100%",
+    height: 60,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 20,
+    shadowColor: "#00bcd4",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
   },
   primaryButtonDisabled: {
-    opacity: 0.65,
+    opacity: 0.5,
   },
-  primaryText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  linkButton: { alignItems: "center", marginTop: 12 },
-  linkText: { color: "#00bcd4", fontWeight: "600" },
+  primaryText: { color: "#081a2e", fontWeight: "800", fontSize: 16, letterSpacing: 1 },
+  linkButton: { alignItems: "center", marginTop: 20 },
+  linkText: { color: "#8e9e9f", fontWeight: "500", fontSize: 14 },
+  cta: { color: "#00bcd4", fontWeight: "800" },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 60,
+  },
+  backText: {
+    color: "#8e9e9f",
+    marginLeft: 8,
+    fontWeight: "600",
+  }
 });

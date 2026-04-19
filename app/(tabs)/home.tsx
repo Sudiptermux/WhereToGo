@@ -1,317 +1,444 @@
-import React, { useEffect, useState, useRef } from "react";
-
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import React, { useState, useEffect } from "react";
 import {
   Image,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  FlatList,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from "expo-location";
+import { placeService } from "../../services/placeService";
 
-const GOOGLE_MAPS_API_KEY = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDjtYc3mEzbuK6qRklklCcyPkBPQu77huQ`; // Replace with your Google Maps API key
+const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
-  const router = useRouter(); // ✅ router added
+  const router = useRouter();
   const [searchText, setSearchText] = useState("");
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
-  const mapRef = useRef<MapView>(null);
-  const fullMapRef = useRef<MapView>(null);
-  const [mapRegion, setMapRegion] = useState({
-    latitude: 37.78825,
-    longitude: -122.4324,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  });
+  const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
+  const [trendingPlaces, setTrendingPlaces] = useState<any[]>([]);
+  const [loadingNearby, setLoadingNearby] = useState(true);
+  const [loadingTrending, setLoadingTrending] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Removed automatic geocoding on every keystroke to avoid API rate limits.
-  // Geocoding is now triggered on search submission.
-
-  const geocodePlace = async (place: string) => {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(place)}&key=${GOOGLE_MAPS_API_KEY}`,
-      );
-      const data = await response.json();
-      if (data.results && data.results.length > 0) {
-        const location = data.results[0].geometry.location;
-        const newRegion = {
-          latitude: location.lat,
-          longitude: location.lng,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        };
-        setMapRegion(newRegion);
-        mapRef.current?.animateToRegion(newRegion, 1000);
-        fullMapRef.current?.animateToRegion(newRegion, 1000);
+  useEffect(() => {
+    // 1. Fetch Trending Places (Random)
+    const fetchTrending = async () => {
+      try {
+        const data = await placeService.getRandomPlaces(4);
+        setTrendingPlaces(data);
+      } catch (err) {
+        console.error("Home Trending Error:", err);
+      } finally {
+        setLoadingTrending(false);
+        setLoadingNearby(false); // Disable nearby loader in safe mode
       }
-    } catch (error) {
-      console.error("Geocoding error:", error);
+    };
+
+    fetchTrending();
+  }, []);
+
+  const handleSearch = () => {
+    if (searchText.trim()) {
+      router.push({ pathname: "/discovery", params: { area: searchText } });
     }
   };
 
+  const calculateDistanceStr = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    // Basic Haversine for display
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const d = R * c;
+    return d < 1 ? `${(d * 1000).toFixed(0)} m away` : `${d.toFixed(1)} km away`;
+  };
+
+  const renderExploreItem = ({ item }: { item: any }) => {
+    const primaryImg = item.place_media?.find((m: any) => m.media_type === 'image')?.url || 
+                     item.place_media?.[0]?.url;
+
+    const getImgSource = (src: any) => typeof src === 'number' ? src : { uri: src };
+
+    return (
+      <TouchableOpacity 
+        style={styles.exploreCard}
+        onPress={() => router.push({ pathname: "/discovery", params: { placeId: item.id } })}
+      >
+        <Image source={getImgSource(primaryImg)} style={styles.exploreImage} />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.8)"]}
+          style={styles.exploreGradient}
+        />
+        <View style={styles.exploreContent}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{item.category?.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.exploreTitle}>{item.title}</Text>
+          <View style={styles.locationRow}>
+            <Ionicons name="location-sharp" size={14} color="#00bcd4" />
+            <Text style={styles.exploreDistance}>{item.location_display}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderTrendingItem = (item: any) => {
+    const primaryImg = item.place_media?.find((m: any) => m.media_type === 'image')?.url || 
+                     item.place_media?.[0]?.url;
+    
+    const getImgSource = (src: any) => typeof src === 'number' ? src : { uri: src };
+
+    return (
+      <TouchableOpacity 
+        key={item.id}
+        style={styles.trendingCard}
+        onPress={() => router.push({ pathname: "/details", params: { id: item.id } })}
+      >
+        <Image source={getImgSource(primaryImg)} style={styles.trendingImage} />
+        <View style={styles.trendingInfo}>
+          <View>
+            <Text style={styles.trendingTitle}>{item.title}</Text>
+            <Text style={styles.trendingCountry}>{item.location_display}</Text>
+          </View>
+          <View style={styles.ratingBadge}>
+            <Ionicons name="star" size={12} color="#fbc02d" />
+            <Text style={styles.ratingText}>{item.rating}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="compass" size={20} color="#fff" />
-            </View>
-            <Text style={styles.title}>WhereToGo</Text>
-          </View>
-
-          <Image
-            source={{ uri: "https://i.pravatar.cc/100" }}
-            style={styles.avatar}
-          />
+          <Text style={styles.brandTitle}>WhereToGo</Text>
+          <TouchableOpacity onPress={() => router.push("/profile")}>
+            <Image
+              source={{ uri: "https://randomuser.me/api/portraits/men/32.jpg" }}
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Search */}
-        <View style={styles.searchBox}>
-          <TouchableOpacity onPress={() => searchText.trim() && geocodePlace(searchText)}>
-            <Feather name="search" size={20} color="#00bcd4" />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Where are you heading next?"
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={() => {
-              if (searchText.trim()) {
-                geocodePlace(searchText);
-              }
-            }}
-            returnKeyType="search"
-          />
-        </View>
-
-        {/* Explore Map Card */}
-        <View style={styles.card}>
-          <MapView ref={mapRef} style={styles.mapImage} region={mapRegion}>
-            {searchText ? (
-              <Marker coordinate={mapRegion} title={searchText} />
-            ) : null}
-          </MapView>
-          <View style={styles.cardContent}>
-            <View>
-              <Text style={styles.cardTitle}>Explore Map</Text>
-              <Text style={styles.cardSubtitle}>
-                Discover hidden gems nearby
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.viewBtn}
-              onPress={() => setIsMapExpanded(true)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "600" }}>View</Text>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBox}>
+            <TouchableOpacity onPress={handleSearch}>
+              <Feather name="search" size={20} color="#8e9e9f" />
             </TouchableOpacity>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search Area (e.g. Sambalpur)"
+              placeholderTextColor="#8e9e9f"
+              value={searchText}
+              onChangeText={setSearchText}
+              onSubmitEditing={handleSearch}
+            />
           </View>
         </View>
 
-        {/* My Planning */}
-        <View style={styles.planningCard}>
-          <View style={styles.planningHeader}>
-            <View style={styles.calendarIcon}>
-              <Ionicons name="calendar" size={20} color="#00bcd4" />
-            </View>
-            <View>
-              <Text style={styles.cardTitle}>My Planning</Text>
-              <Text style={styles.cardSubtitle}>Your upcoming itineraries</Text>
-            </View>
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>ACTIVE TRIPS</Text>
-              <Text style={styles.statNumber}>03</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>DRAFTS</Text>
-              <Text style={styles.statNumberDark}>12</Text>
-            </View>
-          </View>
-
-          {/* ✅ THIS BUTTON NOW NAVIGATES */}
-          <TouchableOpacity
-            style={styles.plannerBtn}
-            onPress={() => router.push("/planner")}
-          >
-            <Text style={styles.plannerText}>Open Planner ✏️</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Ready To Go */}
-        <View style={styles.readyCard}>
-          <Ionicons name="paper-plane" size={40} color="#fff" />
-          <Text style={styles.readyTitle}>Ready to Go?</Text>
-          <Text style={styles.readySubtitle}>
-            Start your navigation for &ldquo;Weekend in Kyoto&rdquo;
+        {/* Explore Nearby with Recommendation Fallback */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {nearbyPlaces.length === 0 ? "Handpicked for You" : "Explore Nearby"}
           </Text>
-
-          <TouchableOpacity style={styles.routeBtn}>
-            <Text style={styles.routeText}>START ROUTE →</Text>
-          </TouchableOpacity>
         </View>
-      </ScrollView>
+        {loadingNearby ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator color="#00bcd4" />
+          </View>
+        ) : (
+          <FlatList
+            data={nearbyPlaces.length > 0 ? nearbyPlaces : trendingPlaces}
+            renderItem={renderExploreItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.exploreList}
+            snapToInterval={width * 0.72}
+            decelerationRate="fast"
+          />
+        )}
 
-      {/* Map Modal */}
-      <Modal
-        visible={isMapExpanded}
-        animationType="slide"
-        onRequestClose={() => setIsMapExpanded(false)}
-      >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => setIsMapExpanded(false)}
+        {/* Journey Card (CTA) */}
+        <TouchableOpacity 
+          style={styles.journeyWrapper}
+          onPress={() => router.push("/(tabs)/plan")}
+        >
+          <LinearGradient
+            colors={["#00F2FE", "#4FACFE"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.journeyCard}
           >
-            <Ionicons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
+            <View style={styles.journeyContent}>
+              <Text style={styles.journeyTitle}>Craft Your{"\n"}Next Journey</Text>
+              <Text style={styles.journeySubtitle}>
+                AI-curated itineraries tailored for you.
+              </Text>
+              
+              <View style={styles.startPlanningBtn}>
+                <Text style={styles.startPlanningText}>Start Planning</Text>
+                <Feather name="arrow-right" size={18} color="#fff" />
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
 
-          <MapView ref={fullMapRef} style={styles.fullMap} region={mapRegion}>
-            {searchText ? (
-              <Marker coordinate={mapRegion} title={searchText} />
-            ) : null}
-          </MapView>
-
+        {/* Trending Now */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Trending Now</Text>
         </View>
-      </Modal>
+        <View style={styles.listContainer}>
+          {loadingTrending ? (
+            <ActivityIndicator color="#00bcd4" />
+          ) : (
+            trendingPlaces.map(renderTrendingItem)
+          )}
+        </View>
 
-    </View>
+        {/* Bottom Padding */}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f2f5f6" },
+  container: { flex: 1, backgroundColor: "#060606" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 20,
     alignItems: "center",
-  },
-  logoRow: { flexDirection: "row", alignItems: "center" },
-  logoCircle: {
-    width: 35,
-    height: 35,
-    borderRadius: 10,
-    backgroundColor: "#00bcd4",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  title: { fontSize: 20, fontWeight: "700" },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
-  searchBox: {
-    backgroundColor: "#e3eaec",
-    marginHorizontal: 20,
-    borderRadius: 15,
-    padding: 15,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  searchText: { marginLeft: 10, color: "#8e9e9f" },
-  searchInput: { marginLeft: 10, flex: 1, color: "#000" },
-  card: {
-    marginHorizontal: 20,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
-  mapImage: { width: "100%", height: 150 },
-  cardContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 15,
-    alignItems: "center",
-  },
-  cardTitle: { fontSize: 18, fontWeight: "700" },
-  cardSubtitle: { color: "#8e9e9f" },
-  viewBtn: {
-    backgroundColor: "#00bcd4",
     paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  planningCard: {
-    marginHorizontal: 20,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 15,
+    paddingTop: 10,
     marginBottom: 20,
   },
-  planningHeader: { flexDirection: "row", alignItems: "center" },
-  calendarIcon: {
-    backgroundColor: "#dff3f5",
-    padding: 10,
-    borderRadius: 12,
-    marginRight: 10,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 15,
-  },
-  statBox: {
-    backgroundColor: "#eef2f3",
-    padding: 15,
-    borderRadius: 15,
-    width: "48%",
-  },
-  statLabel: { fontSize: 12, color: "#8e9e9f" },
-  statNumber: { fontSize: 20, fontWeight: "700", color: "#00bcd4" },
-  statNumberDark: { fontSize: 20, fontWeight: "700" },
-  plannerBtn: {
-    backgroundColor: "#0f172a",
-    padding: 15,
-    borderRadius: 15,
-    alignItems: "center",
-  },
-  plannerText: { color: "#fff", fontWeight: "600" },
-  readyCard: {
-    marginHorizontal: 20,
-    backgroundColor: "#00bcd4",
-    borderRadius: 25,
-    padding: 25,
-    alignItems: "center",
-    marginBottom: 100,
-  },
-  readyTitle: {
+  brandTitle: {
+    fontSize: 28,
+    fontWeight: "800",
     color: "#fff",
+    letterSpacing: -0.5,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 30,
+  },
+  searchBox: {
+    backgroundColor: "#121212",
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    height: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
+    color: "#fff",
+    fontSize: 16,
+  },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
+  sectionTitle: {
     fontSize: 22,
     fontWeight: "700",
-    marginTop: 10,
+    color: "#fff",
   },
-  readySubtitle: {
-    color: "#e0f7fa",
-    textAlign: "center",
-    marginVertical: 10,
+  loaderContainer: {
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  routeBtn: {
-    backgroundColor: "#fff",
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 15,
-    marginTop: 10,
+  emptyText: {
+    color: '#444',
+    paddingLeft: 20,
+    fontStyle: 'italic',
   },
-  routeText: { fontWeight: "700" },
-  modalContainer: { flex: 1, backgroundColor: "#000" },
-  fullMap: { flex: 1 },
-  closeBtn: {
+  exploreList: {
+    paddingLeft: 20,
+    paddingRight: 10,
+    marginBottom: 35,
+  },
+  exploreCard: {
+    width: width * 0.68,
+    height: 320,
+    marginRight: 15,
+    borderRadius: 30,
+    overflow: "hidden",
+    backgroundColor: "#1a1a1a",
+  },
+  exploreImage: {
+    width: "100%",
+    height: "100%",
+  },
+  exploreGradient: {
     position: "absolute",
-    top: 50,
-    right: 20,
-    zIndex: 1,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: "100%",
+  },
+  exploreContent: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+  },
+  categoryBadge: {
     backgroundColor: "rgba(0,0,0,0.5)",
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  categoryText: {
+    color: "#8e9e9f",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
+  exploreTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  exploreDistance: {
+    color: "#8e9e9f",
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  journeyWrapper: {
+    paddingHorizontal: 20,
+    marginBottom: 40,
+  },
+  journeyCard: {
+    borderRadius: 30,
+    padding: 30,
+    minHeight: 220,
+    justifyContent: "center",
+  },
+  journeyContent: {
+    flex: 1,
+  },
+  journeyTitle: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#081a2e",
+    lineHeight: 38,
+    marginBottom: 10,
+  },
+  journeySubtitle: {
+    fontSize: 15,
+    color: "#081a2e",
+    opacity: 0.8,
+    fontWeight: "500",
+    marginBottom: 25,
+    width: "80%",
+  },
+  startPlanningBtn: {
+    backgroundColor: "#121212",
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 20,
-    padding: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  startPlanningText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+    marginRight: 10,
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+  },
+  trendingCard: {
+    flexDirection: "row",
+    backgroundColor: "#121212",
+    borderRadius: 20,
+    padding: 12,
+    marginBottom: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
+  },
+  trendingImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 15,
+  },
+  trendingInfo: {
+    flex: 1,
+    marginLeft: 15,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  trendingTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  trendingCountry: {
+    color: "#8e9e9f",
+    fontSize: 13,
+  },
+  ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  ratingText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+    marginLeft: 4,
   },
 });

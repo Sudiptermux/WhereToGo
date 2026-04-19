@@ -14,52 +14,53 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "#8E8E93",
+        tabBarStyle: {
+          backgroundColor: "#0d0d0d",
+          borderTopWidth: 0,
+          height: 65,
+          paddingBottom: 10,
+        },
+        tabBarActiveTintColor: "#00bcd4",
+        tabBarInactiveTintColor: "#8e9e9f",
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "600",
+        },
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: "Home",
+          title: "HOME",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="inbox"
+        name="plan"
         options={{
-          title: "Inbox",
+          title: "PLAN",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="mail" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="planner"
-        options={{
-          title: "Planner",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size} color={color} />
+            <Ionicons name="calendar-outline" size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="saved"
         options={{
-          title: "Saved",
+          title: "SAVED",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bookmark" size={size} color={color} />
+            <Ionicons name="bookmark-outline" size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="profile"
         options={{
-          title: "Settings",
+          title: "PROFILE",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
+            <Ionicons name="person-outline" size={24} color={color} />
           ),
         }}
       />

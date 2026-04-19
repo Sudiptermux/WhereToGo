@@ -1,16 +1,15 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    SafeAreaView,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { signUp } from "../services/authService";
 
 export default function SignupScreen() {
@@ -59,144 +58,244 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.heading}>Create Account</Text>
-        <Text style={styles.subheading}>Sign up to get started</Text>
-
-        <Text style={styles.label}>Name</Text>
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Full name"
-        />
-
-        <Text style={styles.label}>Email address</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-
-        <Text style={styles.label}>Password</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            secureTextEntry={!passwordVisible}
-          />
-          <TouchableOpacity onPress={() => setPasswordVisible((v) => !v)}>
-            <Feather
-              name={passwordVisible ? "eye-off" : "eye"}
-              size={20}
-              color="#6c8b8e"
-            />
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.innerContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.logoCircle}>
+          <Ionicons name="compass" size={32} color="#081a2e" />
         </View>
 
-        <Text style={styles.label}>Confirm Password</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Confirm Password"
-            secureTextEntry={!confirmPasswordVisible}
-          />
-          <TouchableOpacity
-            onPress={() => setConfirmPasswordVisible((v) => !v)}
-          >
-            <Feather
-              name={confirmPasswordVisible ? "eye-off" : "eye"}
-              size={20}
-              color="#6c8b8e"
-            />
-          </TouchableOpacity>
+        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.subtitle}>Sign up to get started your journey.</Text>
+
+        <View style={styles.form}>
+            <Text style={styles.label}>Full Name</Text>
+            <View style={styles.inputContainer}>
+                <Feather name="user" size={18} color="#8e9e9f" />
+                <TextInput
+                    style={styles.input}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#444"
+                />
+            </View>
+
+            <Text style={styles.label}>Email Address</Text>
+            <View style={styles.inputContainer}>
+                <MaterialIcons name="email" size={18} color="#8e9e9f" />
+                <TextInput
+                    style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#444"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                />
+            </View>
+
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.inputContainer}>
+                <Feather name="lock" size={18} color="#8e9e9f" />
+                <TextInput
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Create a password"
+                    placeholderTextColor="#444"
+                    secureTextEntry={!passwordVisible}
+                />
+                <TouchableOpacity onPress={() => setPasswordVisible((v) => !v)}>
+                    <Feather
+                    name={passwordVisible ? "eye-off" : "eye"}
+                    size={18}
+                    color="#8e9e9f"
+                    />
+                </TouchableOpacity>
+            </View>
+
+            <Text style={styles.label}>Confirm Password</Text>
+            <View style={styles.inputContainer}>
+                <Feather name="lock" size={18} color="#8e9e9f" />
+                <TextInput
+                    style={styles.input}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirm your password"
+                    placeholderTextColor="#444"
+                    secureTextEntry={!confirmPasswordVisible}
+                />
+                <TouchableOpacity
+                    onPress={() => setConfirmPasswordVisible((v) => !v)}
+                >
+                    <Feather
+                    name={confirmPasswordVisible ? "eye-off" : "eye"}
+                    size={18}
+                    color="#8e9e9f"
+                    />
+                </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setAgreed((v) => !v)}
+            >
+                <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+                    {agreed && <Ionicons name="checkmark" size={14} color="#081a2e" />}
+                </View>
+                <Text style={styles.checkboxText}>Accept Terms & Conditions</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[
+                    styles.primaryButton,
+                    loading && styles.primaryButtonDisabled,
+                ]}
+                onPress={onSignup}
+                disabled={loading}
+            >
+                <Text style={styles.primaryText}>
+                    {loading ? "CREATING..." : "CREATE ACCOUNT"}
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                onPress={() => router.push("/")}
+                style={styles.loginLink}
+            >
+                <Text style={styles.loginLinkText}>
+                    Already have an account? <Text style={styles.cta}>Log In</Text>
+                </Text>
+            </TouchableOpacity>
         </View>
-
-        <Text style={styles.label}>Phone number (optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="Phone number"
-          keyboardType="phone-pad"
-        />
-
-        <View style={styles.inlineRow}>
-          <Switch
-            value={agreed}
-            onValueChange={setAgreed}
-            trackColor={{ true: "#00bcd4" }}
-          />
-          <Text style={styles.checkboxLabel}>Accept Terms & Conditions</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.primaryButton,
-            loading && styles.primaryButtonDisabled,
-          ]}
-          onPress={onSignup}
-          disabled={loading}
-        >
-          <Text style={styles.primaryText}>
-            {loading ? "Signing up..." : "Sign Up"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.link} onPress={() => router.push("/")}>
-          <Text style={styles.linkText}>Already have an account? Login</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#e8f1f2" },
-  content: { padding: 20 },
-  heading: { fontSize: 28, fontWeight: "700", marginTop: 20, marginBottom: 8 },
-  subheading: { color: "#6c8b8e", marginBottom: 20 },
-  label: { marginTop: 10, marginBottom: 5, fontWeight: "600" },
+  container: {
+    flex: 1,
+    backgroundColor: "#060606",
+  },
+  innerContainer: {
+    padding: 24,
+    alignItems: "center",
+  },
+  logoCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: "#00bcd4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 15,
+    shadowColor: "#00bcd4",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: "#8e9e9f",
+    marginBottom: 30,
+    fontWeight: "500",
+  },
+  form: {
+    width: "100%",
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#8e9e9f",
+    marginBottom: 8,
+    marginTop: 15,
+    letterSpacing: 1,
+  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    marginBottom: 10,
-    elevation: 2,
-    height: 50,
+    backgroundColor: "#121212",
+    borderRadius: 16,
+    paddingHorizontal: 15,
+    height: 55,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#1a1a1a",
   },
   input: {
-    backgroundColor: "transparent",
-    color: "#000",
-    borderRadius: 14,
-    height: 50,
-    paddingHorizontal: 0,
-    marginBottom: 0,
-    elevation: 0,
+    flex: 1,
+    marginLeft: 11,
+    fontSize: 15,
+    color: "#fff",
   },
-  inlineRow: { flexDirection: "row", alignItems: "center", marginVertical: 15 },
-  checkboxLabel: { marginLeft: 10, color: "#555" },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginVertical: 20,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 1.5,
+    borderColor: "#1a1a1a",
+    backgroundColor: "#121212",
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  checkboxChecked: {
+    backgroundColor: "#00bcd4",
+    borderColor: "#00bcd4",
+  },
+  checkboxText: {
+    color: "#8e9e9f",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   primaryButton: {
     backgroundColor: "#00bcd4",
-    borderRadius: 14,
-    height: 52,
+    width: "100%",
+    height: 60,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
+    shadowColor: "#00bcd4",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 5,
   },
   primaryButtonDisabled: {
-    opacity: 0.65,
+    opacity: 0.5,
   },
-  primaryText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  link: { marginTop: 16, alignItems: "center" },
-  linkText: { color: "#00bcd4", fontWeight: "600" },
+  primaryText: {
+    color: "#081a2e",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  loginLink: {
+    alignItems: "center",
+    marginTop: 30,
+    marginBottom: 30,
+  },
+  loginLinkText: {
+    color: "#8e9e9f",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  cta: {
+    color: "#00bcd4",
+    fontWeight: "800",
+  },
 });
