@@ -8,6 +8,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    TextInput,
     Alert,
     Dimensions,
 } from "react-native";
@@ -96,14 +97,35 @@ export default function ProfileScreen() {
 
                     <View style={styles.nameSection}>
                         <View style={styles.nameRow}>
-                            <Text style={styles.userName}>{userProfile.name}</Text>
-                            <TouchableOpacity style={styles.miniEditBtn} onPress={() => {
-                                Alert.prompt("Edit Name", "Enter your new explorer name", (text) => {
-                                    if (text) updateProfile({ name: text });
-                                });
-                            }}>
-                                <Feather name="edit-3" size={16} color="rgba(255,255,255,0.6)" />
-                            </TouchableOpacity>
+                            {isEditing ? (
+                                <View style={styles.editRow}>
+                                    <TextInput
+                                        style={styles.userNameInput}
+                                        value={newName}
+                                        onChangeText={setNewName}
+                                        autoFocus
+                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                    />
+                                    <TouchableOpacity 
+                                        style={styles.saveBtn} 
+                                        onPress={() => {
+                                            if (newName.trim()) {
+                                                updateProfile({ name: newName.trim() });
+                                                setIsEditing(false);
+                                            }
+                                        }}
+                                    >
+                                        <Ionicons name="checkmark-circle" size={24} color="#00bcd4" />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <>
+                                    <Text style={styles.userName}>{userProfile.name}</Text>
+                                    <TouchableOpacity style={styles.miniEditBtn} onPress={() => setIsEditing(true)}>
+                                        <Feather name="edit-3" size={16} color="rgba(255,255,255,0.6)" />
+                                    </TouchableOpacity>
+                                </>
+                            )}
                         </View>
                         <View style={styles.personaBadge}>
                             <Text style={styles.personaText}>{getPersona().toUpperCase()}</Text>
@@ -297,6 +319,25 @@ const styles = StyleSheet.create({
   },
   miniEditBtn: {
     padding: 5,
+  },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(0,188,212,0.3)',
+  },
+  userNameInput: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+    minWidth: 150,
+    paddingVertical: 8,
+  },
+  saveBtn: {
+    marginLeft: 10,
   },
   personaBadge: {
     backgroundColor: 'rgba(255,255,255,0.05)',

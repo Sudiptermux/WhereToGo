@@ -138,7 +138,10 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.brandTitle}>WhereToGo</Text>
+          <View>
+            <Text style={styles.brandTitle}>WhereToGo</Text>
+            <Text style={styles.welcomeText}>Hi, {userProfile.name.split(' ')[0]}</Text>
+          </View>
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
             {userProfile.avatar ? (
                 <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
@@ -249,6 +252,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#fff",
     letterSpacing: -0.5,
+  },
+  welcomeText: {
+    color: "#00bcd4",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: -2,
+    opacity: 0.8,
   },
   avatar: {
     width: 42,

@@ -11,9 +11,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signUp } from "../services/authService";
+import { useTrip } from "../context/TripContext";
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { updateProfile } = useTrip();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -41,8 +43,12 @@ export default function SignupScreen() {
     setLoading(true);
     try {
       await signUp({ name, email, password, phone });
+      
+      // Sync global profile
+      updateProfile({ name });
+
       alert(
-        "Signup successful. Please check your email for a verification code.",
+        "Signup successful! User identity created.",
       );
       router.push({
         pathname: "/verify",

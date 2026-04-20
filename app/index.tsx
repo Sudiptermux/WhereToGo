@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signIn } from "../services/authService";
+import { useTrip } from "../context/TripContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -20,6 +21,7 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
+  const { updateProfile } = useTrip();
 
   const onLogin = async () => {
     if (!email.trim() || !password) {
@@ -30,6 +32,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signIn({ email, password });
+      
+      // Personalize: Extract name from email for the Demo Mode
+      const inferredName = email.split('@')[0].split('.')[0];
+      const capitalized = inferredName.charAt(0).toUpperCase() + inferredName.slice(1);
+      updateProfile({ name: capitalized });
+
       router.replace("/(tabs)/home");
     } catch (error) {
       const message = (error as any)?.message || JSON.stringify(error);

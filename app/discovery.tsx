@@ -62,8 +62,13 @@ const ReelItem = memo(({
         source={getSource(item.image)} 
         style={styles.backgroundImage}
         resizeMode="cover"
-        blurRadius={isActive && videoSource ? 15 : 0}
+        blurRadius={isActive ? 25 : 0}
       />
+      
+      {/* Cinematic Tint Layer for Depth */}
+      {isActive && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+      )}
       
       {/* Foreground Layer: ACTIVE Video View */}
       {isActive && videoSource ? (
@@ -80,14 +85,7 @@ const ReelItem = memo(({
                 style={styles.fullImage}
                 resizeMode="contain"
             />
-            {(!videoSource || item.isMissingMedia) && (
-                <View style={[StyleSheet.absoluteFill, styles.comingSoonOverlay]}>
-                    <View style={styles.playPlaceholder}>
-                        <Ionicons name="videocam-off" size={40} color="rgba(255,255,255,0.4)" />
-                    </View>
-                    <Text style={styles.comingSoonText}>CINEMA REEL COMING SOON</Text>
-                </View>
-            )}
+
         </View>
       )}
 
