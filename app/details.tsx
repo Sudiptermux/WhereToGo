@@ -33,7 +33,7 @@ export default function PlaceDetailsScreen() {
     const fetchDetails = async () => {
       setLoading(true);
       try {
-        const data = await placeService.getPlaceById(id as string);
+        const data = await placeService.getPlaceByIdentifier(id as string);
         if (!data) throw new Error("Place not found");
         setPlace(data);
       } catch (err) {
@@ -72,7 +72,13 @@ export default function PlaceDetailsScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Place not found</Text>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace("/discovery");
+          }
+        }}>
           <Text style={styles.backLink}>Go Back</Text>
         </TouchableOpacity>
       </View>

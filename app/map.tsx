@@ -39,6 +39,7 @@ export default function SelectedMapScreen() {
   
   const [routePath, setRoutePath] = useState<{ latitude: number; longitude: number }[]>([]);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [isRoadMapping, setIsRoadMapping] = useState(false);
 
   // Initial region centered on Bhubaneswar
   const INITIAL_REGION = {
@@ -50,8 +51,18 @@ export default function SelectedMapScreen() {
 
   useEffect(() => {
     if (selectedPlaces && selectedPlaces.length > 0) {
-      if (selectedPlaces.length > 1) {
-        fetchActualRoute();
+      const validCoords = selectedPlaces
+        .map(p => ({
+          latitude: p.lat || p.coordinates?.latitude,
+          longitude: p.lng || p.coordinates?.longitude,
+        }))
+        .filter((c): c is { latitude: number; longitude: number } => !!c.latitude && !!c.longitude);
+
+      if (validCoords.length > 1) {
+        // Show straight lines initially
+        setRoutePath(validCoords);
+        // Try road-path in background
+        fetchRoadPath(validCoords);
       } else {
         const p = selectedPlaces[0];
         const lat = p.lat || p.coordinates?.latitude;
@@ -71,55 +82,38 @@ export default function SelectedMapScreen() {
     }
   }, [selectedPlaces]);
 
-  const fetchActualRoute = async () => {
-    const validCoords = (selectedPlaces || [])
-      .map(p => ({
-        latitude: p.lat || p.coordinates?.latitude,
-        longitude: p.lng || p.coordinates?.longitude,
-      }))
-      .filter((c): c is { latitude: number; longitude: number } => !!c.latitude && !!c.longitude);
+  const fetchRoadPath = async (coords: { latitude: number, longitude: number }[]) => {
+    setIsRoadMapping(true);
+    
+    // Create a timeout controller
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second limit
 
-    if (validCoords.length < 2) {
-      setRoutePath(validCoords);
-      return;
-    }
-
-    setIsLoadingRoute(true);
     try {
-      // Use a slightly larger timeout or retry logic if needed, stable OSRM endpoint
-      const coordString = validCoords.map(c => `${c.longitude},${c.latitude}`).join(";");
+      const coordString = coords.map(c => `${c.longitude},${c.latitude}`).join(";");
       const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`;
       
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Routing service unavailable");
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        setIsRoadMapping(false);
+        return; 
+      }
       
       const data = await response.json();
-
       if (data.routes && data.routes[0]) {
         const geojson = data.routes[0].geometry.coordinates;
-        const formattedRoute = geojson.map((c: [number, number]) => ({
+        const formatted = geojson.map((c: [number, number]) => ({
           latitude: c[1],
           longitude: c[0],
         }));
-        setRoutePath(formattedRoute);
-        
-        // Auto-zoom to fit markers
-        setTimeout(() => {
-            if (mapRef.current && formattedRoute.length > 0) {
-                mapRef.current.fitToCoordinates(formattedRoute, {
-                    edgePadding: { top: 100, right: 100, bottom: 400, left: 100 },
-                    animated: true,
-                });
-            }
-        }, 800);
-      } else {
-        setRoutePath(validCoords);
+        setRoutePath(formatted);
       }
-    } catch (error) {
-      console.error("Routing error:", error);
-      setRoutePath(validCoords); // Fast fallback to straight lines
+    } catch (e) {
+      // If it times out or fails, we just keep the straight lines
     } finally {
-      setIsLoadingRoute(false);
+      setIsRoadMapping(false);
     }
   };
 
@@ -156,27 +150,38 @@ export default function SelectedMapScreen() {
           initialRegion={INITIAL_REGION}
           customMapStyle={DARK_MAP_STYLE}
         >
-          {/* Render Neon Glow Route */}
+          {/* Render Route */}
           {routePath.length > 0 && (
             <>
-              {/* Outer Glow */}
-              <Polyline
-                coordinates={routePath}
-                strokeColor="rgba(0, 188, 212, 0.2)"
-                strokeWidth={12}
-              />
-              {/* Secondary Glow */}
-              <Polyline
-                coordinates={routePath}
-                strokeColor="rgba(0, 188, 212, 0.4)"
-                strokeWidth={6}
-              />
-              {/* Vibrant Core */}
-              <Polyline
-                coordinates={routePath}
-                strokeColor="#00bcd4"
-                strokeWidth={3}
-              />
+              {/* Hybrid Visualization: Simple line while loading, Glow path when ready */}
+              {isRoadMapping ? (
+                // LOADING STATE: Dotted/Simple line
+                <Polyline
+                  coordinates={routePath}
+                  strokeColor="rgba(0, 188, 212, 0.4)"
+                  strokeWidth={3}
+                  lineDashPattern={[5, 5]}
+                />
+              ) : (
+                // READY STATE: Neon Glow
+                <>
+                  <Polyline
+                    coordinates={routePath}
+                    strokeColor="rgba(0, 188, 212, 0.2)"
+                    strokeWidth={12}
+                  />
+                  <Polyline
+                    coordinates={routePath}
+                    strokeColor="rgba(0, 188, 212, 0.4)"
+                    strokeWidth={6}
+                  />
+                  <Polyline
+                    coordinates={routePath}
+                    strokeColor="#00bcd4"
+                    strokeWidth={3}
+                  />
+                </>
+              )}
             </>
           )}
 
@@ -196,7 +201,7 @@ export default function SelectedMapScreen() {
                        styles.markerBody, 
                        { backgroundColor: object.color, borderColor: "#fff", borderWidth: 2 }
                     ]}>
-                        <Ionicons name={object.icon as any} size={18} color="#000" />
+                        <Text style={styles.markerNumber}>{index + 1}</Text>
                     </View>
                     <View style={styles.markerLabel}>
                         <Text style={styles.markerLabelText}>{place.title}</Text>
@@ -216,14 +221,15 @@ export default function SelectedMapScreen() {
             </TouchableOpacity>
 
             <View style={styles.statusBadge}>
-                {isLoadingRoute ? (
-                    <ActivityIndicator size="small" color="#ff9800" style={{ marginRight: 10 }} />
-                ) : (
-                    <View style={styles.statusDot} />
-                )}
-                <Text style={styles.statusText}>
-                    {isLoadingRoute ? "OPTIMIZING ROUTE..." : "LIVE NAVIGATOR"}
-                </Text>
+              <View style={[styles.statusDot, { 
+                backgroundColor: isRoadMapping ? "#FFC107" : (routePath.length > 0 ? "#00E676" : "#FFC107"),
+                shadowColor: isRoadMapping ? "#FFC107" : "#00E676",
+                shadowOpacity: 0.5,
+                shadowRadius: 5,
+              }]} />
+              <Text style={styles.statusText}>
+                {isRoadMapping ? "MAPPING ROADS..." : (routePath.length > 0 ? "LIVE NAVIGATOR" : "PLAN YOUR ROUTE")}
+              </Text>
             </View>
         </View>
       </SafeAreaView>
@@ -318,26 +324,30 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.8)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 14,
-    marginLeft: 15,
+    backgroundColor: "rgba(10, 10, 10, 0.85)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginLeft: 12,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#00bcd4",
     marginRight: 10,
   },
   statusText: {
-    color: "#fff",
-    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 10,
     fontWeight: "900",
-    letterSpacing: 2,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   markerContainer: {
     alignItems: "center",
@@ -369,6 +379,11 @@ const styles = StyleSheet.create({
     marginTop: 5,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  markerNumber: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "900",
   },
   markerLabelText: {
     color: "#fff",

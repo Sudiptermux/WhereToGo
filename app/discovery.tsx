@@ -102,7 +102,7 @@ const ReelItem = memo(({
           </View>
           <TouchableOpacity 
             style={styles.infoSection}
-            onPress={() => router.push({ pathname: "/details", params: { id: item.id } })}
+            onPress={() => router.push({ pathname: "/details", params: { id: item.slug } })}
           >
             <Text style={styles.placeTitle}>{item.title}</Text>
             <View style={styles.locationRow}>

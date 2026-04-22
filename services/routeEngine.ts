@@ -169,6 +169,50 @@ export const optimizeRoute = (
 };
 
 /**
+ * Lightweight Preview Optimization for Map Selection
+ * Returns a sorted array of places based on shortest path
+ */
+export const previewRoute = (
+  selectedPlaces: Place[],
+  stayLocation: Place | null
+): Place[] => {
+  if (selectedPlaces.length <= 1) return selectedPlaces;
+
+  const places = [...selectedPlaces];
+  const depot = stayLocation || { lat: 20.2450, lng: 85.8200 };
+  const depotLat = depot.lat || (depot as any).coordinates?.latitude || 20.2450;
+  const depotLng = depot.lng || (depot as any).coordinates?.longitude || 85.8200;
+
+  const ordered: Place[] = [];
+  let currentLat = depotLat;
+  let currentLng = depotLng;
+  let remaining = [...places];
+
+  while (remaining.length > 0) {
+    let nearestIdx = 0;
+    let minDist = Infinity;
+
+    remaining.forEach((p, idx) => {
+      const pLat = p.lat || p.coordinates?.latitude || depotLat;
+      const pLng = p.lng || p.coordinates?.longitude || depotLng;
+      const d = getDistance(currentLat, currentLng, pLat, pLng);
+      if (d < minDist) {
+        minDist = d;
+        nearestIdx = idx;
+      }
+    });
+
+    const next = remaining[nearestIdx];
+    ordered.push(next);
+    remaining.splice(nearestIdx, 1);
+    currentLat = next.lat || next.coordinates?.latitude || depotLat;
+    currentLng = next.lng || next.coordinates?.longitude || depotLng;
+  }
+
+  return ordered;
+};
+
+/**
  * Formats minutes to HH:MM AM/PM
  */
 const formatTime = (totalMins: number): string => {

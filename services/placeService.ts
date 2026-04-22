@@ -1,45 +1,49 @@
-import { ALL_PLACES } from "../constants/places";
+import { supabase } from "./supabaseClient";
 
 /**
- * Helper to transform local objects to match the expected UI schema.
- * This ensures consistency across the app while using local data.
+ * Helper to transform Supabase objects to match the expected UI schema.
  */
-const normalizePlace = (p: any) => {
+export const normalizePlace = (p: any) => {
     if (!p) return null;
     
-    // Fallback image if missing
-    const hasOriginalImage = !!p.image;
-    const finalImage = hasOriginalImage ? p.image : require("../PlaceDB/Images/coming-soon.png");
+    const finalImage = p.image_url || require("../assets/images/coming-soon.png");
 
-    // Generate media array from local fields if not already present
     const media: any[] = [];
     media.push({ 
         url: finalImage, 
         media_type: 'image', 
         is_primary: true,
-        isPlaceholder: !hasOriginalImage 
+        isPlaceholder: !p.image_url 
     });
 
-    if (p.video) {
-        media.push({ url: p.video, media_type: 'video', is_primary: true });
+    if (p.video_url) {
+        media.push({ url: p.video_url, media_type: 'video', is_primary: true });
     }
     
-    if (p.gallery && p.gallery.length > 0) {
-        p.gallery.forEach((g: any) => media.push({ url: g, media_type: 'image', is_primary: false }));
+    if (p.gallery && Array.isArray(p.gallery)) {
+        p.gallery.forEach((g: any) => media.push({ 
+            url: typeof g === 'string' ? g : g.url, 
+            media_type: 'image', 
+            is_primary: false 
+        }));
     }
 
-    const description = p.description || p.description_full || "";
+    const description = p.description || "";
 
     return {
         ...p,
+        // UI expects 'id' to be the slug for routing in current implementation
+        // But internal relations should use the UUID 'id'
+        id: p.id, 
+        slug: p.slug,
+        title: p.title,
         image: finalImage,
-        isMissingMedia: !hasOriginalImage,
-        hasVideo: !!p.video,
+        isMissingMedia: !p.image_url,
+        hasVideo: !!p.video_url,
         place_media: media,
-        // Ensure lat/lng are top-level for the unified coordinate system
-        lat: p.lat || p.coordinates?.latitude,
-        lng: p.lng || p.coordinates?.longitude,
-        location_display: p.location || p.location_display,
+        lat: p.lat,
+        lng: p.lng,
+        location_display: p.location,
         description_full: description,
         description_short: p.description_short || (description.length > 50 
             ? description.substring(0, 50) + '...' 
@@ -49,58 +53,98 @@ const normalizePlace = (p: any) => {
 
 export const placeService = {
   /**
-   * Fetch a single place by ID
+   * Fetch by UUID
    */
   async getPlaceById(id: string) {
-    const p = ALL_PLACES.find(item => item.id === id);
-    return normalizePlace(p);
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .eq('id', id)
+        .single();
+    
+    if (error) return null;
+    return normalizePlace(data);
   },
 
   /**
-   * Fetch a random set of places
+   * Fetch by Slug (for routing)
    */
+  async getPlaceBySlug(slug: string) {
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+    
+    if (error) return null;
+    return normalizePlace(data);
+  },
+
+  /**
+   * Smart Fetcher: Tries UUID first, then Slug
+   */
+  async getPlaceByIdentifier(identifier: string) {
+    if (!identifier) return null;
+
+    // Check if it's a UUID
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(identifier);
+
+    if (isUUID) {
+       const resp = await this.getPlaceById(identifier);
+       if (resp) return resp;
+    }
+
+    // Try by slug
+    return await this.getPlaceBySlug(identifier);
+  },
+
   async getRandomPlaces(limit = 4) {
-    const shuffled = [...ALL_PLACES].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, limit).map(normalizePlace);
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .limit(limit);
+        
+    if (error) return [];
+    return (data || []).map(normalizePlace);
   },
 
-  /**
-   * Search places by keyword (title or location)
-   */
   async searchPlaces(query: string) {
-    const q = query.toLowerCase();
-    const filtered = ALL_PLACES.filter(p => 
-        p.title.toLowerCase().includes(q) || 
-        (p.location && p.location.toLowerCase().includes(q))
-    );
-    return filtered.map(normalizePlace);
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .or(`title.ilike.%${query}%,location.ilike.%${query}%,slug.ilike.%${query}%`);
+
+    if (error) return [];
+    return (data || []).map(normalizePlace);
   },
 
-  /**
-   * Recommendation Logic: Get a place AND its neighbors in the same area
-   */
-  async getPlaceWithAreaMates(placeId: string) {
-    const seed = ALL_PLACES.find(p => p.id === placeId);
+  async getPlaceWithAreaMates(identifier: string) {
+    // Try UUID first, then Slug
+    const { data: seed } = await supabase
+        .from('places')
+        .select('*')
+        .or(`id.eq.${identifier},slug.eq.${identifier}`)
+        .single();
+    
     if (!seed) return [];
 
-    // "Area Mates" find places in the same city/area
-    const mates = ALL_PLACES.filter(p => 
-        p.id !== placeId && 
-        p.location && seed.location &&
-        p.location.toLowerCase() === seed.location.toLowerCase()
-    );
+    const { data: mates } = await supabase
+        .from('places')
+        .select('*')
+        .neq('id', seed.id)
+        .eq('location', seed.location)
+        .limit(5);
     
-    // If we have mates in the same area, show them. Otherwise show randoms.
-    const resultMates = mates.length > 0 ? mates : ALL_PLACES.filter(p => p.id !== placeId);
-    
-    return [normalizePlace(seed), ...resultMates.slice(0, 5).map(normalizePlace)];
+    const resultMates = (mates && mates.length > 0) ? mates : [];
+    return [normalizePlace(seed), ...resultMates.map(normalizePlace)];
   },
 
-  /**
-   * GPS Logic (Mocked for Demo stability)
-   */
   async getNearby(lat: number, lng: number, limit = 3) {
-    // For now, return random places as "Nearby"
-    return ALL_PLACES.slice(0, limit).map(normalizePlace);
+    const { data } = await supabase
+        .from('places')
+        .select('*')
+        .limit(limit);
+
+    return (data || []).map(normalizePlace);
   }
 };

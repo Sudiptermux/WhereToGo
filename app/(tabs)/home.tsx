@@ -109,7 +109,7 @@ export default function HomeScreen() {
       <TouchableOpacity 
         key={item.id}
         style={styles.trendingCard}
-        onPress={() => router.push({ pathname: "/details", params: { id: item.id } })}
+        onPress={() => router.push({ pathname: "/details", params: { id: item.slug } })}
       >
         <View style={styles.trendingImageWrapper}>
             <Image source={getImgSource(item.image)} style={styles.trendingImage} />

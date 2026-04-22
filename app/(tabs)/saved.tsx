@@ -17,7 +17,7 @@ import { useRouter } from "expo-router";
 const { width } = Dimensions.get("window");
 
 export default function SavedScreen() {
-  const { savedTrips, loadSavedTrip, likedPlaces, toggleLike } = useTrip();
+  const { savedTrips, loadSavedTrip, likedPlaces, toggleLike, deleteTrip } = useTrip();
   const router = useRouter();
 
   const getSource = (src: any) => typeof src === 'number' ? src : { uri: src };
@@ -25,6 +25,10 @@ export default function SavedScreen() {
   const handleLoadTrip = (trip: any) => {
     loadSavedTrip(trip);
     router.push("/journey");
+  };
+
+  const handleDeleteTrip = (id: string) => {
+    deleteTrip(id);
   };
 
   return (
@@ -103,8 +107,11 @@ export default function SavedScreen() {
                   <View style={[styles.statusBadge, { backgroundColor: trip.statusColor }]}>
                     <Text style={styles.statusText}>{trip.status}</Text>
                   </View>
-                  <TouchableOpacity style={styles.editBtn}>
-                     <Feather name="edit-2" size={18} color="#fff" />
+                  <TouchableOpacity style={styles.editBtn} onPress={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTrip(trip.id);
+                  }}>
+                     <Feather name="trash-2" size={18} color="#ff4444" />
                   </TouchableOpacity>
                 </View>
 

@@ -35,11 +35,18 @@ Designed for high-stakes presentations, the app operates in a fully stable "Safe
 
 ---
 
+## 📖 Extensive Documentation
+For a deep dive into the system architecture, design philosophy, and core engine logic, please refer to the:
+[**Technical Documentation & System Report**](file:///c:/Users/Unik/Downloads/WTG%20App/WhereToGO/DOCUMENTATION.md)
+
+---
+
 ## 🛠️ Technology Stack
 
 - **Core**: React Native & Expo (v54+)
 - **Navigation**: Expo Router (File-based routing)
-- **State**: React Context API (`TripContext`)
+- **State**: React Context API (`TripContext.tsx`)
+- **Engine**: Multi-constraint Greedy Optimization Engine
 - **Animation**: 
   - `react-native-reanimated` (Fluid transitions & UI micro-interactions)
   - `expo-linear-gradient` (Tonal layering & premium overlays)
@@ -54,7 +61,7 @@ Designed for high-stakes presentations, the app operates in a fully stable "Safe
 WhereToGo/
 ├── app/                  # File-based routing (Tabs, Shared Screens)
 │   ├── (tabs)/           # Home, Discovery, Saved, Profile
-│   ├── planner.tsx       # AI Optimization Entry
+│   ├── planner.tsx       # AI Optimization Entry & Stay Hub
 │   ├── journey.tsx       # Optimized Itinerary View
 │   └── loader.tsx        # System status & calculation animation
 ├── components/           # Reusable UI (Buttons, Cards, Modals)

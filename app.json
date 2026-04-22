@@ -7,7 +7,6 @@
     "icon": "./assets/images/logo.png",
     "scheme": "wheretogo",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {

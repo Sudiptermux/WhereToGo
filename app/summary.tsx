@@ -59,7 +59,13 @@ export default function TripSummaryScreen() {
       <LinearGradient colors={["#060606", "#0a1a2e"]} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace("/discovery");
+          }
+        }}>
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Summary</Text>

@@ -21,7 +21,7 @@ const { width } = Dimensions.get("window");
 
 export default function JourneyScreen() {
   const router = useRouter();
-  const { optimizedJourney, visitedPlaces, toggleVisited, stayLocation, saveActiveTrip, userProfile } = useTrip();
+  const { optimizedJourney, visitedPlaces, toggleVisited, stayLocation, saveActiveTrip, userProfile, clearTrip } = useTrip();
   const [activeDay, setActiveDay] = useState(1);
 
   const currentDayPlan = optimizedJourney.find(d => d.day === activeDay) || { day: 1, places: [] };
@@ -37,6 +37,7 @@ export default function JourneyScreen() {
   const handleSave = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Success);
     saveActiveTrip();
+    clearTrip(); // Reset selection so a new trip can be planned
     router.replace("/(tabs)/saved");
   };
 

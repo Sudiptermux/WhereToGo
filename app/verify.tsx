@@ -69,7 +69,7 @@ export default function VerifyScreen() {
 
         <Text style={styles.heading}>Email Verification</Text>
         <Text style={styles.subheading}>
-          Enter the 6-digit code we sent to your email address.
+          Enter the verification code we sent to your email address.
         </Text>
 
         <View style={styles.inputWrapper}>
@@ -77,10 +77,10 @@ export default function VerifyScreen() {
             style={styles.input}
             value={code}
             onChangeText={setCode}
-            placeholder="000 000"
+            placeholder="00000000"
             placeholderTextColor="#444"
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={8}
             />
         </View>
 
@@ -150,10 +150,10 @@ const styles = StyleSheet.create({
     height: 65,
     paddingHorizontal: 20,
     color: "#fff",
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
-    letterSpacing: 10,
+    letterSpacing: 8,
     borderWidth: 1,
     borderColor: "#1a1a1a",
   },

@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "../services/supabaseClient";
+import { normalizePlace } from "../services/placeService";
 
 export type Place = {
-  id: string;
+  id: string; // Internal UUID
+  slug: string; // Readable string ID (e.g. 'lingaraj-temple')
   title: string;
   location?: string;
   location_display?: string;
@@ -40,7 +43,7 @@ export type SavedTrip = {
   }[];
   stayLocation: Place | null;
   dateCreated: string;
-  visitedPlaces: string[];
+  visitedPlaces: string[]; // Stores UUIDs
 };
 
 export type UserProfile = {
@@ -87,6 +90,8 @@ interface TripContextType {
   isPlaceSelected: (id: string) => boolean;
   userProfile: UserProfile;
   updateProfile: (updates: Partial<UserProfile>) => void;
+  syncWithCloud: () => Promise<void>;
+  deleteTrip: (id: string) => Promise<void>;
 }
 
 const TripContext = createContext<TripContextType | undefined>(undefined);
@@ -114,31 +119,114 @@ export function TripProvider({ children }: { children: ReactNode }) {
     level: 1
   });
 
-  // Load profile from storage on mount
+  // Load profile / Auth Sync & Global Listener
   useEffect(() => {
+    // 1. Initial Data Load from Storage
     const loadData = async () => {
       try {
         const saved = await AsyncStorage.getItem("@wtg_user_profile");
         if (saved) setUserProfile(JSON.parse(saved));
       } catch (e) {
-        console.log("Failed to load profile", e);
+        console.log("Initial profile load failed", e);
       }
     };
     loadData();
+
+    // 2. Auth State Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[TripContext] Auth Event: ${event}`);
+      if (session?.user) {
+        await syncWithCloud();
+      } else if (event === 'SIGNED_OUT') {
+        clearLocalState();
+      }
+    });
+
+    return () => {
+        subscription.unsubscribe();
+    };
   }, []);
+
+  const clearLocalState = () => {
+    setSelectedPlaces([]);
+    setStayLocation(null);
+    setOptimizedJourney([]);
+    setVisitedPlaces([]);
+    setLikedPlaces([]);
+    setSavedTrips([]);
+    setActiveTripId(null);
+    setUserProfile({
+        name: "Demo Traveler",
+        avatar: null,
+        level: 1
+    });
+  };
+
+  const syncWithCloud = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // 1. Sync Profile
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (profile) {
+        setUserProfile({
+            name: profile.name,
+            avatar: profile.avatar_url,
+            level: profile.level
+        });
+    }
+
+    // 2. Sync Activity (UUID based)
+    const { data: activity } = await supabase.from('user_activity').select('*, places(*)').eq('user_id', user.id);
+    if (activity) {
+        const liked = activity.filter(a => a.is_liked && a.places).map(a => normalizePlace(a.places));
+        const visited = activity.filter(a => a.is_visited).map(a => a.place_id);
+        setLikedPlaces(liked);
+        setVisitedPlaces(visited);
+    }
+
+    // 3. Sync Trips (UUID based)
+    const { data: trips } = await supabase.from('trips').select('*').eq('user_id', user.id);
+    if (trips) {
+        const mappedTrips = trips.map(t => ({
+            id: t.id,
+            title: t.title,
+            dates: t.dates_display,
+            status: t.status,
+            statusColor: t.status_color,
+            image: t.image_url,
+            days: t.trip_data as any[],
+            stayLocation: null,
+            dateCreated: t.created_at,
+            visitedPlaces: t.visited_places || []
+        }));
+        setSavedTrips(mappedTrips);
+    }
+  };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     const newProfile = { ...userProfile, ...updates };
     setUserProfile(newProfile);
+    
     try {
       await AsyncStorage.setItem("@wtg_user_profile", JSON.stringify(newProfile));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+          await supabase.from('profiles').upsert({
+              id: user.id,
+              name: newProfile.name,
+              avatar_url: newProfile.avatar,
+              level: newProfile.level
+          });
+      }
     } catch (e) {
-      console.log("Failed to save profile", e);
+      console.log("Failed to update profile", e);
     }
   };
 
   const addToTrip = (place: Place) => {
     setSelectedPlaces((prev) => {
+      // UUID check
       if (prev.find((p) => p.id === place.id)) return prev;
       return [...prev, place];
     });
@@ -149,50 +237,85 @@ export function TripProvider({ children }: { children: ReactNode }) {
     setVisitedPlaces((prev) => prev.filter((pid) => pid !== id));
   };
 
-  const toggleLike = (place: Place) => {
+  const toggleLike = async (place: Place) => {
+    const isLiking = !likedPlaces.some(p => p.id === place.id);
     setLikedPlaces((prev) => {
       if (prev.find((p) => p.id === place.id)) {
         return prev.filter(p => p.id !== place.id);
       }
       return [...prev, place];
     });
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        await supabase.from('user_activity').upsert({
+            user_id: user.id,
+            place_id: place.id, // UUID
+            is_liked: isLiking
+        }, { onConflict: 'user_id,place_id' });
+    }
   };
 
   const isLiked = (id: string) => {
-    return likedPlaces.some(p => p.id === id);
+    // ID can be slug or UUID if coming from different parts of UI
+    // We try to find in context where likedPlaces stores full objects
+    return likedPlaces.some(p => p.id === id || p.slug === id);
   };
 
-  const toggleVisited = (id: string) => {
+  const toggleVisited = async (id: string) => {
+    // id should be UUID here
+    const isVisiting = !visitedPlaces.includes(id);
     setVisitedPlaces((prev) => 
       prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]
     );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        await supabase.from('user_activity').upsert({
+            user_id: user.id,
+            place_id: id,
+            is_visited: isVisiting
+        }, { onConflict: 'user_id,place_id' });
+    }
   };
 
-  const saveActiveTrip = () => {
+  const saveActiveTrip = async () => {
     if (optimizedJourney.length === 0) return;
 
     const totalStops = optimizedJourney.reduce((acc, d) => acc + d.places.length, 0);
     const isComplete = visitedPlaces.length === totalStops && totalStops > 0;
     
+    const { data: { user } } = await supabase.auth.getUser();
+
     if (activeTripId) {
-      setSavedTrips(prev => prev.map(trip => {
-        if (trip.id === activeTripId) {
-          return {
-            ...trip,
-            status: isComplete ? 'COMPLETE' : 'DRAFT',
-            statusColor: isComplete ? '#00bcd4' : '#7c5a0b',
-            days: [...optimizedJourney],
-            visitedPlaces: [...visitedPlaces],
-            stayLocation: stayLocation,
-          };
-        }
-        return trip;
-      }));
+      const tripToUpdate = savedTrips.find(t => t.id === activeTripId);
+      if (!tripToUpdate) return;
+
+      const updatedTrip = {
+        ...tripToUpdate,
+        status: isComplete ? 'COMPLETE' : 'DRAFT' as const,
+        statusColor: isComplete ? '#00bcd4' : '#7c5a0b',
+        days: [...optimizedJourney],
+        visitedPlaces: [...visitedPlaces],
+        stayLocation: stayLocation,
+      };
+
+      setSavedTrips(prev => prev.map(t => t.id === activeTripId ? updatedTrip : t));
+
+      if (user) {
+        await supabase.from('trips').update({
+          title: updatedTrip.title,
+          status: updatedTrip.status,
+          trip_data: updatedTrip.days,
+          visited_places: updatedTrip.visitedPlaces
+        }).eq('id', activeTripId);
+      }
       return;
     }
 
+    const tempId = Date.now().toString();
     const newTrip: SavedTrip = {
-      id: Date.now().toString(),
+      id: tempId,
       title: `Trip to ${stayLocation?.location_display || "Bhubaneswar"}`,
       dates: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + " - " + 
              new Date(Date.now() + 86400000 * (numberOfDays || 1)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -206,7 +329,26 @@ export function TripProvider({ children }: { children: ReactNode }) {
     };
 
     setSavedTrips(prev => [newTrip, ...prev]);
-    setActiveTripId(newTrip.id);
+    setActiveTripId(tempId);
+
+    if (user) {
+        const { data } = await supabase.from('trips').insert({
+            user_id: user.id,
+            title: newTrip.title,
+            dates_display: newTrip.dates,
+            status: newTrip.status,
+            status_color: newTrip.statusColor,
+            image_url: typeof newTrip.image === 'string' ? newTrip.image : null,
+            trip_data: newTrip.days,
+            visited_places: newTrip.visitedPlaces,
+            stay_location_id: stayLocation?.id // UUID
+        }).select().single();
+        
+        if (data) {
+            setSavedTrips(prev => prev.map(t => t.id === tempId ? { ...t, id: data.id } : t));
+            setActiveTripId(data.id);
+        }
+    }
   };
 
   const loadSavedTrip = (trip: SavedTrip) => {
@@ -214,7 +356,6 @@ export function TripProvider({ children }: { children: ReactNode }) {
     setStayLocation(trip.stayLocation);
     setVisitedPlaces(trip.visitedPlaces);
     setActiveTripId(trip.id);
-    // Reconstruct selectedPlaces from the days
     const allPlaces = trip.days.flatMap(d => d.places);
     setSelectedPlaces(allPlaces);
     setNumberOfDays(trip.days.length);
@@ -229,8 +370,21 @@ export function TripProvider({ children }: { children: ReactNode }) {
     setActiveTripId(null);
   };
 
+  const deleteTrip = async (id: string) => {
+    setSavedTrips(prev => prev.filter(t => t.id !== id));
+    if (activeTripId === id) {
+        clearTrip();
+    }
+    
+    try {
+        await supabase.from('trips').delete().eq('id', id);
+    } catch (e) {
+        console.error("Cloud deletion failed", e);
+    }
+  };
+
   const isPlaceSelected = (id: string) => {
-    return selectedPlaces.some((p) => p.id === id);
+    return selectedPlaces.some((p) => p.id === id || p.slug === id);
   };
 
   return (
@@ -258,6 +412,8 @@ export function TripProvider({ children }: { children: ReactNode }) {
         isPlaceSelected,
         userProfile,
         updateProfile,
+        syncWithCloud,
+        deleteTrip,
       }}
     >
       {children}
