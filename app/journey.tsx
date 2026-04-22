@@ -26,7 +26,11 @@ export default function JourneyScreen() {
 
   const currentDayPlan = optimizedJourney.find(d => d.day === activeDay) || { day: 1, places: [] };
   const totalStops = optimizedJourney.reduce((acc, d) => acc + d.places.length, 0);
-  const progressPercent = (visitedPlaces.length / totalStops) * 100;
+  
+  // Filter visited places to only include those in the current trip to avoid overflow (e.g. 11/10)
+  const allTripPlaceIds = optimizedJourney.flatMap(d => d.places.map(p => p.id));
+  const visitedStopsCount = visitedPlaces.filter(id => allTripPlaceIds.includes(id)).length;
+  const progressPercent = totalStops > 0 ? (visitedStopsCount / totalStops) * 100 : 0;
 
   const handleNavigate = (place: Place) => {
     const { latitude, longitude } = place.coordinates || { latitude: 20.2450, longitude: 85.8200 };
@@ -34,9 +38,9 @@ export default function JourneyScreen() {
     Linking.openURL(url);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Success);
-    saveActiveTrip();
+    await saveActiveTrip();
     clearTrip(); // Reset selection so a new trip can be planned
     router.replace("/(tabs)/saved");
   };
@@ -67,7 +71,7 @@ export default function JourneyScreen() {
             <View style={styles.progressContainer}>
                 <View style={styles.progressTextRow}>
                     <Text style={styles.progressLabel}>Overall Progress</Text>
-                    <Text style={styles.progressValue}>{visitedPlaces.length}/{totalStops} STOPS</Text>
+                    <Text style={styles.progressValue}>{visitedStopsCount}/{totalStops} STOPS</Text>
                 </View>
                 <View style={styles.progressBar}>
                     <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
@@ -110,13 +114,13 @@ export default function JourneyScreen() {
             </View>
 
             {/* Destinations */}
-            {currentDayPlan.places.map((place: any, index: number) => {
+            {currentDayPlan.places.map((place: Place, index: number) => {
                 const isVisited = visitedPlaces.includes(place.id);
                 return (
                     <View key={`${place.id}-${index}`} style={styles.waypointContainer}>
                         <View style={styles.connectorContainer}>
                             {/* Transit Time indicator */}
-                            {place.travelTimeMinutes > 0 && (
+                            {(place.travelTimeMinutes ?? 0) > 0 && (
                                 <View style={styles.transitIndicator}>
                                     <View style={styles.transitLine} />
                                     <View style={styles.transitLabel}>

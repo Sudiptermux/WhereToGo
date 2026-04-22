@@ -5,19 +5,14 @@ import { Place } from "../context/TripContext";
  * Specialized for Travel Itineraries (VRP with Time Windows)
  */
 
-interface OptimizedPlace extends Place {
-  arrivalTime?: string;
-  departureTime?: string;
-  travelTimeMinutes?: number;
-}
-
 interface OptimizedDay {
   day: number;
-  places: OptimizedPlace[];
+  places: Place[];
   totalDistanceKm: number;
   estimatedDurationMins: number;
   startTime: string;
   endTime: string;
+  finalTransitMinutes?: number;
 }
 
 const AVERAGE_SPEED_KMH = 30; // More conservative city traffic
@@ -120,7 +115,7 @@ export const optimizeRoute = (
       }
 
       // Add to current day with timing metadata
-      const placeWithTimes: OptimizedPlace = {
+      const placeWithTimes: Place = {
         ...nextPlace,
         arrivalTime: formatTime(expectedArrival + lunchPadding),
         departureTime: formatTime(expectedDeparture + lunchPadding),
@@ -149,8 +144,6 @@ export const optimizeRoute = (
       estimatedDurationMins: dayEndTime - (IDEAL_START_HOUR * 60),
       startTime: formatTime(IDEAL_START_HOUR * 60),
       endTime: formatTime(dayEndTime),
-      // Adding total distance back to depot as metadata for the last leg
-      //@ts-ignore
       finalTransitMinutes: finalReturnTime
     });
 

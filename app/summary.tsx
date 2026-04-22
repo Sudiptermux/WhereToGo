@@ -122,7 +122,7 @@ export default function TripSummaryScreen() {
                     <View style={styles.dayLine} />
                 </View>
 
-                {day.places.map((place: any, pIdx) => (
+                {day.places.map((place: Place, pIdx) => (
                     <View key={`place-${place.id}`} style={styles.timelineItem}>
                         <View style={styles.timelineLeft}>
                             <View style={[styles.timelineDot, pIdx === 0 && styles.activeDot]} />

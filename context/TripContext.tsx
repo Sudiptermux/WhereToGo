@@ -7,6 +7,7 @@ export type Place = {
   id: string; // Internal UUID
   slug: string; // Readable string ID (e.g. 'lingaraj-temple')
   title: string;
+  category?: string;
   location?: string;
   location_display?: string;
   description?: string;
@@ -21,6 +22,11 @@ export type Place = {
     latitude: number;
     longitude: number;
   };
+  avg_duration_mins?: number;
+  opening_time?: string;
+  closing_time?: string;
+  best_visit_time?: string;
+  entry_fee?: string;
   arrivalTime?: string;
   departureTime?: string;
   travelTimeMinutes?: number;
@@ -63,8 +69,10 @@ interface TripContextType {
     estimatedDurationMins?: number;
     startTime?: string;
     endTime?: string;
+    finalTransitMinutes?: number;
   }[];
-  visitedPlaces: string[];
+  visitedPlaces: string[]; // For current active trip
+  lifetimeVisitedPlaces: string[]; // For global stats/profile
   savedTrips: SavedTrip[];
   activeTripId: string | null;
   addToTrip: (place: Place) => void;
@@ -82,6 +90,7 @@ interface TripContextType {
   }[]) => void;
   likedPlaces: Place[];
   toggleVisited: (id: string) => void;
+  isVisited: (id: string) => boolean;
   toggleLike: (place: Place) => void;
   isLiked: (id: string) => boolean;
   saveActiveTrip: () => void;
@@ -110,6 +119,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
     finalTransitMinutes?: number;
   }[]>([]);
   const [visitedPlaces, setVisitedPlaces] = useState<string[]>([]);
+  const [lifetimeVisitedPlaces, setLifetimeVisitedPlaces] = useState<string[]>([]);
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [likedPlaces, setLikedPlaces] = useState<Place[]>([]);
@@ -152,6 +162,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
     setStayLocation(null);
     setOptimizedJourney([]);
     setVisitedPlaces([]);
+    setLifetimeVisitedPlaces([]);
     setLikedPlaces([]);
     setSavedTrips([]);
     setActiveTripId(null);
@@ -182,7 +193,8 @@ export function TripProvider({ children }: { children: ReactNode }) {
         const liked = activity.filter(a => a.is_liked && a.places).map(a => normalizePlace(a.places));
         const visited = activity.filter(a => a.is_visited).map(a => a.place_id);
         setLikedPlaces(liked);
-        setVisitedPlaces(visited);
+        setLifetimeVisitedPlaces(visited);
+        // DO NOT overwrite visitedPlaces here, as that is trip-specific
     }
 
     // 3. Sync Trips (UUID based)
@@ -264,26 +276,39 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
   const toggleVisited = async (id: string) => {
     // id should be UUID here
-    const isVisiting = !visitedPlaces.includes(id);
+    const isInTripCheckIn = visitedPlaces.includes(id);
+    const isLifetimeVisited = lifetimeVisitedPlaces.includes(id);
+
+    // 1. Update Trip-Specific Check-ins (Toggle)
     setVisitedPlaces((prev) => 
       prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]
     );
+
+    // 2. Update Lifetime Visited (If checking in for the first time or explicitly toggling)
+    // For now, checking in on a trip automatically marks it as visited in lifetime
+    if (!isLifetimeVisited) {
+        setLifetimeVisitedPlaces(prev => [...prev, id]);
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
         await supabase.from('user_activity').upsert({
             user_id: user.id,
             place_id: id,
-            is_visited: isVisiting
+            is_visited: !isInTripCheckIn // If checking in, mark as visited
         }, { onConflict: 'user_id,place_id' });
     }
+  };
+
+  const isVisited = (id: string) => {
+    return lifetimeVisitedPlaces.includes(id);
   };
 
   const saveActiveTrip = async () => {
     if (optimizedJourney.length === 0) return;
 
-    const totalStops = optimizedJourney.reduce((acc, d) => acc + d.places.length, 0);
-    const isComplete = visitedPlaces.length === totalStops && totalStops > 0;
+    const uniqueTripPlaceIds = Array.from(new Set(optimizedJourney.flatMap(d => d.places.map(p => p.id))));
+    const isComplete = uniqueTripPlaceIds.length > 0 && uniqueTripPlaceIds.every(id => visitedPlaces.includes(id));
     
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -294,7 +319,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
       const updatedTrip = {
         ...tripToUpdate,
         status: isComplete ? 'COMPLETE' : 'DRAFT' as const,
-        statusColor: isComplete ? '#00bcd4' : '#7c5a0b',
+        statusColor: isComplete ? '#00bcd4' : '#FF9800', // Cyan for complete, Orange for draft
         days: [...optimizedJourney],
         visitedPlaces: [...visitedPlaces],
         stayLocation: stayLocation,
@@ -320,7 +345,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
       dates: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + " - " + 
              new Date(Date.now() + 86400000 * (numberOfDays || 1)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       status: isComplete ? 'COMPLETE' : 'DRAFT',
-      statusColor: isComplete ? '#00bcd4' : '#7c5a0b',
+      statusColor: isComplete ? '#00bcd4' : '#FF9800',
       image: optimizedJourney[0]?.places[0]?.image || "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&q=80&w=600",
       days: [...optimizedJourney],
       stayLocation: stayLocation,
@@ -395,6 +420,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         numberOfDays,
         optimizedJourney,
         visitedPlaces,
+        lifetimeVisitedPlaces,
         savedTrips,
         activeTripId,
         addToTrip,
@@ -403,6 +429,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         setNumberOfDays,
         setOptimizedJourney,
         toggleVisited,
+        isVisited,
         likedPlaces,
         toggleLike,
         isLiked,
