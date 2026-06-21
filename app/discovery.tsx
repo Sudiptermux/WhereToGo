@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, memo, useCallback } from "react";
+import React, { useEffect, useState, useRef, memo, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,10 +17,11 @@ import { useTrip, Place } from "../context/TripContext";
 import { placeService } from "../services/placeService";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "../context/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
-// HIGH-PERFORMANCE REEL v1.2 - UNIQUE_CACHE_BUSTER_9922
+// HIGH-PERFORMANCE REEL v1.3 - THEME_READY
 const ReelItem = memo(({ 
     item, 
     addToTrip, 
@@ -31,6 +32,8 @@ const ReelItem = memo(({
     videoSource,
     isLiked,
     toggleLike,
+    colors,
+    isDark
 }: { 
     item: Place; 
     addToTrip: (item: any) => void;
@@ -41,8 +44,11 @@ const ReelItem = memo(({
     videoSource: any;
     isLiked: boolean;
     toggleLike: (item: any) => void;
+    colors: any;
+    isDark: boolean;
 }) => {
   const router = useRouter();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const getSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
@@ -67,7 +73,7 @@ const ReelItem = memo(({
       
       {/* Cinematic Tint Layer for Depth */}
       {isActive && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.1)' }]} />
       )}
       
       {/* Foreground Layer: ACTIVE Video View */}
@@ -85,12 +91,11 @@ const ReelItem = memo(({
                 style={styles.fullImage}
                 resizeMode="contain"
             />
-
         </View>
       )}
 
       <LinearGradient
-        colors={["rgba(0,0,0,0.6)", "transparent", "rgba(0,0,0,0.9)"]}
+        colors={isDark ? ["rgba(0,0,0,0.6)", "transparent", "rgba(0,0,0,0.9)"] : ["rgba(0,0,0,0.3)", "transparent", "rgba(0,0,0,0.7)"]}
         style={styles.gradient}
       />
 
@@ -106,7 +111,7 @@ const ReelItem = memo(({
           >
             <Text style={styles.placeTitle}>{item.title}</Text>
             <View style={styles.locationRow}>
-              <Ionicons name="location-sharp" size={18} color="#00bcd4" />
+              <Ionicons name="location-sharp" size={18} color={colors.primary} />
               <Text style={styles.locationText}>{item.location_display}</Text>
             </View>
           </TouchableOpacity>
@@ -118,9 +123,9 @@ const ReelItem = memo(({
         <View style={styles.sidebar}>
           <TouchableOpacity style={styles.premiumActionButton} onPress={handleAdd}>
             <View style={[styles.premiumIconCircle, isAlreadySelected && styles.premiumIconCircleActive]}>
-              <Ionicons name={isAlreadySelected ? "checkmark" : "add"} size={26} color={isAlreadySelected ? "#00bcd4" : "#fff"} />
+              <Ionicons name={isAlreadySelected ? "checkmark" : "add"} size={26} color={isAlreadySelected ? colors.primary : "#fff"} />
             </View>
-            <Text style={[styles.premiumActionLabel, isAlreadySelected && { color: '#00bcd4' }]}>{isAlreadySelected ? "SAVED" : "ADD"}</Text>
+            <Text style={[styles.premiumActionLabel, isAlreadySelected && { color: colors.primary }]}>{isAlreadySelected ? "SAVED" : "ADD"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.premiumActionButton} onPress={() => {
@@ -156,26 +161,26 @@ export default function DiscoveryScreen() {
   const router = useRouter();
   const { area, placeId } = useLocalSearchParams();
   const { addToTrip, removeFromTrip, selectedPlaces, isPlaceSelected, toggleLike, isLiked } = useTrip();
+  const { colors, isDark } = useTheme();
+  
   const [places, setPlaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // SHARED PLAYER POOL (The Performance Engine)
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
+  // SHARED PLAYER POOL
   const sharedPlayer = useVideoPlayer(null, (p) => {
     p.loop = true;
-    p.muted = false; // Always unmuted when playing active
+    p.muted = false;
     console.log("[WhereToGo] High-Performance Player Engine Initialized");
   });
 
-  // AUDIO AUTO-STOP Logic: Ensuring global silence when leaving the feed
   useFocusEffect(
     useCallback(() => {
-      // When screen is focused, we don't need to do anything special here.
       return () => {
-        // Use a safety check and try-catch to prevent crashes if native object is released
         try {
           if (sharedPlayer) {
-            console.log("[Discovery] User left screen - Pausing playback");
             sharedPlayer.pause();
             sharedPlayer.muted = true;
           }
@@ -187,7 +192,7 @@ export default function DiscoveryScreen() {
   );
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 80 // Higher threshold for more "intentional" snaps
+    itemVisiblePercentThreshold: 80
   }).current;
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
@@ -197,7 +202,6 @@ export default function DiscoveryScreen() {
       
       let vSource = activeItem.video || activeItem.place_media?.find((m: any) => m.media_type === 'video')?.url;
       if (vSource) {
-          // Normalize source for expo-video
           const normalizedSource = typeof vSource === 'string' ? { uri: vSource } : vSource;
           sharedPlayer.replace(normalizedSource);
           sharedPlayer.play();
@@ -221,7 +225,7 @@ export default function DiscoveryScreen() {
         } else if (area) {
           data = await placeService.searchPlaces(area as string);
         } else {
-          data = await placeService.getRandomPlaces(10);
+          data = await placeService.getPopular(10);
         }
         setPlaces(data);
         if (data.length > 0) setActiveId(data[0].id);
@@ -237,7 +241,7 @@ export default function DiscoveryScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#00bcd4" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -250,10 +254,13 @@ export default function DiscoveryScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.itineraryBadge} onPress={() => router.push("/map")}>
-        <LinearGradient colors={["rgba(0,0,0,0.5)", "rgba(0,0,0,0.8)"]} style={styles.badgeGradient}>
-            <Ionicons name="briefcase" size={20} color="#00bcd4" />
-            <View style={styles.countBubble}>
-                <Text style={styles.countText}>{selectedPlaces.length}</Text>
+        <LinearGradient 
+            colors={isDark ? ["rgba(0,0,0,0.5)", "rgba(0,0,0,0.8)"] : ["rgba(255,255,255,0.7)", "rgba(255,255,255,0.9)"]} 
+            style={[styles.badgeGradient, !isDark && { borderColor: colors.border }]}
+        >
+            <Ionicons name="briefcase" size={20} color={colors.primary} />
+            <View style={[styles.countBubble, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.countText, { color: isDark ? "#081a2e" : "#fff" }]}>{selectedPlaces.length}</Text>
             </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -271,6 +278,8 @@ export default function DiscoveryScreen() {
             videoSource={item.video || item.place_media?.find((m: any) => m.media_type === 'video')?.url}
             isLiked={isLiked(item.id)}
             toggleLike={toggleLike}
+            colors={colors}
+            isDark={isDark}
           />
         )}
         keyExtractor={(item) => item.id}
@@ -281,7 +290,6 @@ export default function DiscoveryScreen() {
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        // STABILITY TUNING
         windowSize={3}
         initialNumToRender={2}
         maxToRenderPerBatch={2}
@@ -291,15 +299,16 @@ export default function DiscoveryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: colors.background,
   },
   reelContainer: {
     width: width,
     height: height,
     position: "relative",
+    backgroundColor: isDark ? "#000" : colors.background,
   },
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
@@ -345,7 +354,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0, 188, 212, 0.3)",
   },
   countBubble: {
-    backgroundColor: "#00bcd4",
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -354,7 +362,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   countText: {
-    color: "#081a2e",
     fontSize: 10,
     fontWeight: "900",
   },
@@ -387,11 +394,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#ff9800",
+    backgroundColor: colors.accent,
     marginRight: 8,
   },
   trendingText: {
-    color: "#ff9800",
+    color: colors.accent,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1.5,
@@ -404,6 +411,9 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "900",
     marginBottom: 8,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   locationRow: {
     flexDirection: "row",
@@ -411,16 +421,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   locationText: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 16,
     fontWeight: "700",
     marginLeft: 6,
   },
   description: {
-    color: "rgba(255,255,255,0.75)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "500",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   sidebar: {
     alignItems: "center",
@@ -434,11 +447,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.12)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.2)",
     marginBottom: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -446,8 +459,8 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   premiumIconCircleActive: {
-    backgroundColor: "rgba(0, 188, 212, 0.15)",
-    borderColor: "rgba(0, 188, 212, 0.4)",
+    backgroundColor: "rgba(0, 188, 212, 0.2)",
+    borderColor: "rgba(0, 188, 212, 0.5)",
     borderWidth: 1.5,
   },
   premiumActionLabel: {
@@ -461,27 +474,4 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   fullImage: { ...StyleSheet.absoluteFillObject },
-  comingSoonOverlay: {
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  playPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  comingSoonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 2,
-    opacity: 0.8,
-  },
 });

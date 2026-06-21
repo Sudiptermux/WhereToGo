@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip, Place } from "../context/TripContext";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../context/ThemeContext";
 
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 
@@ -32,16 +33,29 @@ const DARK_MAP_STYLE = [
   { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
 ];
 
+const LIGHT_MAP_STYLE = [
+  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+  { "elementType": "labels.icon", "stylers": [{ "visibility": "on" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+  { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "color": "#bdbdbd" }] },
+  { "featureType": "road", "elementType": "geometry.fill", "stylers": [{ "color": "#ffffff" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e3f2fd" }] }
+];
+
 export default function SelectedMapScreen() {
   const router = useRouter();
   const { selectedPlaces } = useTrip();
+  const { colors, isDark } = useTheme();
   const mapRef = useRef<any>(null);
   
   const [routePath, setRoutePath] = useState<{ latitude: number; longitude: number }[]>([]);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [isRoadMapping, setIsRoadMapping] = useState(false);
 
-  // Initial region centered on Bhubaneswar
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const INITIAL_REGION = {
     latitude: 20.2450,
     longitude: 85.8200,
@@ -59,10 +73,15 @@ export default function SelectedMapScreen() {
         .filter((c): c is { latitude: number; longitude: number } => !!c.latitude && !!c.longitude);
 
       if (validCoords.length > 1) {
-        // Show straight lines initially
         setRoutePath(validCoords);
-        // Try road-path in background
         fetchRoadPath(validCoords);
+        
+        setTimeout(() => {
+          mapRef.current?.fitToCoordinates(validCoords, {
+            edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+            animated: true,
+          });
+        }, 1500);
       } else {
         const p = selectedPlaces[0];
         const lat = p.lat || p.coordinates?.latitude;
@@ -84,10 +103,8 @@ export default function SelectedMapScreen() {
 
   const fetchRoadPath = async (coords: { latitude: number, longitude: number }[]) => {
     setIsRoadMapping(true);
-    
-    // Create a timeout controller
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second limit
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     try {
       const coordString = coords.map(c => `${c.longitude},${c.latitude}`).join(";");
@@ -111,7 +128,6 @@ export default function SelectedMapScreen() {
         setRoutePath(formatted);
       }
     } catch (e) {
-      // If it times out or fails, we just keep the straight lines
     } finally {
       setIsRoadMapping(false);
     }
@@ -119,24 +135,24 @@ export default function SelectedMapScreen() {
 
   const getMarkerObject = (title: string) => {
     const name = title.toLowerCase();
-    if (name.includes("temple")) return { icon: "castle", color: "#FFD700" }; // Golden for temples
-    if (name.includes("zoo") || name.includes("kanan")) return { icon: "paw", color: "#4CAF50" }; // Green for nature/zoo
-    if (name.includes("caves")) return { icon: "mountain", color: "#9E9E9E" }; // Grey for rocks/caves
-    if (name.includes("giri") || name.includes("stupa")) return { icon: "sunny", color: "#FF9800" }; // Orange for pagodas
-    return { icon: "location", color: "#00bcd4" }; // Default Cyan
+    if (name.includes("temple")) return { icon: "castle", color: "#FFD700" };
+    if (name.includes("zoo") || name.includes("kanan")) return { icon: "paw", color: "#4CAF50" };
+    if (name.includes("caves")) return { icon: "mountain", color: "#9E9E9E" };
+    if (name.includes("giri") || name.includes("stupa")) return { icon: "sunny", color: "#FF9800" };
+    return { icon: "location", color: colors.primary };
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
       
       {Platform.OS === 'web' ? (
         <View style={styles.webFallbackContainer}>
             <LinearGradient
-                colors={["#0c0c0c", "#1a1a1a"]}
+                colors={isDark ? ["#0c0c0c", "#1a1a1a"] : [colors.background, colors.surface]}
                 style={StyleSheet.absoluteFill}
             />
-            <Ionicons name="map-outline" size={80} color="rgba(0, 188, 212, 0.2)" />
+            <Ionicons name="map-outline" size={80} color={isDark ? "rgba(0, 188, 212, 0.2)" : "rgba(0, 188, 212, 0.1)"} />
             <Text style={styles.webFallbackTitle}>LIVE NAVIGATOR</Text>
             <Text style={styles.webFallbackSubtitle}>
                 Map visualization is active on mobile. On web, you are viewing the curated sequence for {selectedPlaces[0]?.location || "your trip"}.
@@ -148,36 +164,33 @@ export default function SelectedMapScreen() {
           provider={PROVIDER_GOOGLE}
           style={styles.map}
           initialRegion={INITIAL_REGION}
-          customMapStyle={DARK_MAP_STYLE}
+          customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
         >
-          {/* Render Route */}
+          
           {routePath.length > 0 && (
             <>
-              {/* Hybrid Visualization: Simple line while loading, Glow path when ready */}
               {isRoadMapping ? (
-                // LOADING STATE: Dotted/Simple line
                 <Polyline
                   coordinates={routePath}
-                  strokeColor="rgba(0, 188, 212, 0.4)"
+                  strokeColor={isDark ? "rgba(0, 188, 212, 0.4)" : "rgba(0, 188, 212, 0.3)"}
                   strokeWidth={3}
                   lineDashPattern={[5, 5]}
                 />
               ) : (
-                // READY STATE: Neon Glow
                 <>
                   <Polyline
                     coordinates={routePath}
-                    strokeColor="rgba(0, 188, 212, 0.2)"
+                    strokeColor={isDark ? "rgba(0, 188, 212, 0.2)" : "rgba(0, 188, 212, 0.1)"}
                     strokeWidth={12}
                   />
                   <Polyline
                     coordinates={routePath}
-                    strokeColor="rgba(0, 188, 212, 0.4)"
+                    strokeColor={isDark ? "rgba(0, 188, 212, 0.4)" : "rgba(0, 188, 212, 0.2)"}
                     strokeWidth={6}
                   />
                   <Polyline
                     coordinates={routePath}
-                    strokeColor="#00bcd4"
+                    strokeColor={colors.primary}
                     strokeWidth={3}
                   />
                 </>
@@ -199,7 +212,7 @@ export default function SelectedMapScreen() {
                 <View style={styles.markerContainer}>
                     <View style={[
                        styles.markerBody, 
-                       { backgroundColor: object.color, borderColor: "#fff", borderWidth: 2 }
+                       { backgroundColor: object.color, borderColor: isDark ? "#fff" : colors.background, borderWidth: 2 }
                     ]}>
                         <Text style={styles.markerNumber}>{index + 1}</Text>
                     </View>
@@ -213,11 +226,10 @@ export default function SelectedMapScreen() {
         </MapView>
       )}
 
-      {/* Top Header Controls */}
       <SafeAreaView style={styles.topHeader}>
         <View style={styles.headerRow}>
             <TouchableOpacity style={styles.circleIcon} onPress={() => router.back()}>
-                <Ionicons name="arrow-back" size={24} color="#fff" />
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
 
             <View style={styles.statusBadge}>
@@ -234,10 +246,9 @@ export default function SelectedMapScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Bottom Summary Card */}
       <View style={styles.bottomCardContainer}>
         <LinearGradient
-            colors={["rgba(30, 30, 30, 1)", "rgba(10, 10, 10, 1)"]}
+            colors={isDark ? ["rgba(30, 30, 30, 1)", "rgba(10, 10, 10, 1)"] : [colors.surface, colors.background]}
             style={styles.bottomCard}
         >
             <View style={styles.dragIndicator} />
@@ -258,14 +269,14 @@ export default function SelectedMapScreen() {
                 onPress={() => router.push("/planner")}
             >
                 <LinearGradient
-                    colors={["#00F2FE", "#4FACFE"]}
+                    colors={isDark ? ["#00F2FE", "#4FACFE"] : [colors.primary, "#81ecec"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.planButtonGradient}
                 >
                     <Text style={styles.planButtonText}>Create Smart Plan</Text>
                     <View style={styles.planActionIcon}>
-                        <Ionicons name="arrow-forward" size={18} color="#00bcd4" />
+                        <Ionicons name="arrow-forward" size={18} color={isDark ? colors.primary : "#fff"} />
                     </View>
                 </LinearGradient>
             </TouchableOpacity>
@@ -283,7 +294,7 @@ export default function SelectedMapScreen() {
                   style={styles.addMoreThumbnail}
                   onPress={() => router.push("/discovery")}
                 >
-                    <Ionicons name="add" size={24} color="rgba(255,255,255,0.4)" />
+                    <Ionicons name="add" size={24} color={colors.textSecondary} />
                 </TouchableOpacity>
             </ScrollView>
         </LinearGradient>
@@ -292,10 +303,10 @@ export default function SelectedMapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: colors.background,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -315,26 +326,32 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: "rgba(30, 30, 30, 0.9)",
+    backgroundColor: isDark ? "rgba(30, 30, 30, 0.9)" : "rgba(255, 255, 255, 0.9)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(10, 10, 10, 0.85)",
+    backgroundColor: isDark ? "rgba(10, 10, 10, 0.85)" : "rgba(255, 255, 255, 0.95)",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     marginLeft: 12,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
+    elevation: 4,
   },
   statusDot: {
     width: 8,
@@ -343,7 +360,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   statusText: {
-    color: "rgba(255, 255, 255, 0.9)",
+    color: colors.text,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.5,
@@ -360,33 +377,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 10,
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  markerIndex: {
-    color: "#081a2e",
-    fontSize: 14,
-    fontWeight: "900",
   },
   markerLabel: {
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    backgroundColor: isDark ? "rgba(0, 0, 0, 0.9)" : "rgba(255, 255, 255, 0.95)",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     marginTop: 5,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   markerNumber: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontSize: 14,
     fontWeight: "900",
   },
   markerLabelText: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 10,
     fontWeight: "800",
   },
@@ -401,15 +415,21 @@ const styles = StyleSheet.create({
     padding: 25,
     paddingTop: 15,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   dragIndicator: {
     width: 35,
     height: 4,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: colors.border,
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 20,
+    opacity: 0.5,
   },
   selectionInfo: {
     marginBottom: 20,
@@ -417,17 +437,18 @@ const styles = StyleSheet.create({
   selectionTitle: {
     fontSize: 26,
     fontWeight: "900",
-    color: "#fff",
+    color: colors.text,
     marginBottom: 5,
   },
   selectionCount: {
-    color: "#00bcd4",
+    color: colors.primary,
   },
   selectionSubtitle: {
     fontSize: 13,
-    color: "rgba(255,255,255,0.6)",
+    color: colors.textSecondary,
     fontWeight: "500",
     lineHeight: 18,
+    opacity: 0.8,
   },
   planButton: {
     marginBottom: 25,
@@ -441,7 +462,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   planButtonText: {
-    color: "#011627",
+    color: isDark ? "#011627" : "#fff",
     fontSize: 17,
     fontWeight: "900",
     marginRight: 10,
@@ -450,7 +471,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "rgba(2, 28, 50, 0.15)",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -463,18 +484,18 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     marginRight: 12,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: colors.border,
   },
   addMoreThumbnail: {
     width: 60,
     height: 60,
     borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: colors.border,
   },
   webFallbackContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -483,18 +504,20 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   webFallbackTitle: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 24,
     fontWeight: "900",
     marginTop: 20,
     letterSpacing: 4,
   },
   webFallbackSubtitle: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: "center",
     marginTop: 15,
     lineHeight: 22,
     maxWidth: 400,
+    paddingHorizontal: 20,
+    opacity: 0.6,
   },
 });

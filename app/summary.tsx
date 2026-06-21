@@ -14,27 +14,17 @@ import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip, Place } from "../context/TripContext";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
-
-// Utility to calculate Distance (Haversine)
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-};
 
 export default function TripSummaryScreen() {
   const router = useRouter();
   const { optimizedJourney, stayLocation } = useTrip();
+  const { colors, isDark } = useTheme();
 
-  // Calculate Metrics from Engine Metadata
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const stats = useMemo(() => {
     let totalKm = 0;
     let totalMins = 0;
@@ -55,8 +45,10 @@ export default function TripSummaryScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#060606", "#0a1a2e"]} style={StyleSheet.absoluteFill} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      
+      {!isDark && <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />}
+      {isDark && <LinearGradient colors={["#060606", "#0a1a2e"]} style={StyleSheet.absoluteFill} />}
 
       <SafeAreaView style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => {
@@ -66,7 +58,7 @@ export default function TripSummaryScreen() {
             router.replace("/discovery");
           }
         }}>
-          <Ionicons name="close" size={24} color="#fff" />
+          <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Summary</Text>
         <View style={{ width: 44 }} />
@@ -77,7 +69,7 @@ export default function TripSummaryScreen() {
         {/* Executive Stats Dashboard */}
         <View style={styles.dashboard}>
             <LinearGradient
-                colors={["rgba(0, 188, 212, 0.15)", "rgba(0,0,0,0)"]}
+                colors={isDark ? ["rgba(0, 188, 212, 0.15)", "rgba(0,0,0,0)"] : ["rgba(0, 188, 212, 0.05)", "rgba(255,255,255,0)"]}
                 style={styles.dashGradient}
             >
                 <View style={styles.statBox}>
@@ -143,7 +135,7 @@ export default function TripSummaryScreen() {
                                 </View>
                                 <View style={styles.metaRow}>
                                     <View style={styles.metaItem}>
-                                        <Feather name="clock" size={12} color="#00bcd4" />
+                                        <Feather name="clock" size={12} color={colors.primary} />
                                         <Text style={styles.metaText}>{place.avg_duration_mins || 120}m visit</Text>
                                     </View>
                                     <View style={[styles.metaItem, { marginLeft: 15 }]}>
@@ -153,7 +145,7 @@ export default function TripSummaryScreen() {
                                 </View>
                             </View>
                             <TouchableOpacity style={styles.detailsIcon}>
-                                <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.2)" />
+                                <Ionicons name="arrow-forward" size={18} color={colors.border} />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -171,14 +163,14 @@ export default function TripSummaryScreen() {
             onPress={() => router.push("/journey")}
         >
             <LinearGradient
-                colors={["#00bcd4", "#008ba3"]}
+                colors={isDark ? ["#00bcd4", "#008ba3"] : [colors.primary, "#81ecec"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.startGradient}
             >
                 <Text style={styles.startText}>START YOUR ADVENTURE</Text>
                 <View style={styles.startIcon}>
-                    <Ionicons name="rocket" size={20} color="#00bcd4" />
+                    <Ionicons name="rocket" size={20} color={isDark ? colors.primary : "#fff"} />
                 </View>
             </LinearGradient>
         </TouchableOpacity>
@@ -187,10 +179,10 @@ export default function TripSummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -203,12 +195,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   headerTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 20,
     fontWeight: "900",
     letterSpacing: 2,
@@ -220,9 +214,9 @@ const styles = StyleSheet.create({
   dashboard: {
     marginTop: 20,
     borderRadius: 30,
-    backgroundColor: "#0d0d0d",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(0, 188, 212, 0.1)",
+    borderColor: colors.border,
     overflow: "hidden",
   },
   dashGradient: {
@@ -235,12 +229,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   statVal: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 32,
     fontWeight: "900",
   },
   statLab: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 10,
     fontWeight: "800",
     marginTop: 5,
@@ -249,13 +243,13 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: "60%",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.border,
     alignSelf: "center",
   },
   baseCampCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,152,0,0.05)",
+    backgroundColor: isDark ? "rgba(255,152,0,0.05)" : "rgba(255,152,0,0.03)",
     padding: 20,
     borderRadius: 24,
     marginTop: 25,
@@ -272,7 +266,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   baseTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
     marginTop: 2,
@@ -288,20 +282,21 @@ const styles = StyleSheet.create({
   dayLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.border,
   },
   dayTitle: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: "900",
     letterSpacing: 2,
+    opacity: 0.7,
   },
   dayTitleContainer: {
     alignItems: 'center',
     marginHorizontal: 15,
   },
   dayTimeRange: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 10,
     fontWeight: "700",
     marginTop: 4,
@@ -314,8 +309,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   arrivalBadge: {
-    backgroundColor: 'rgba(0, 188, 212, 0.1)',
-    color: '#00bcd4',
+    backgroundColor: isDark ? 'rgba(0, 188, 212, 0.1)' : 'rgba(0, 188, 212, 0.05)',
+    color: colors.primary,
     fontSize: 10,
     fontWeight: '800',
     paddingHorizontal: 8,
@@ -335,32 +330,37 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: "#333",
+    borderColor: colors.border,
     marginTop: 25,
   },
   activeDot: {
-    backgroundColor: "#00bcd4",
-    borderColor: "rgba(0,188,212,0.3)",
+    backgroundColor: colors.primary,
+    borderColor: isDark ? "rgba(0,188,212,0.3)" : "rgba(0,188,212,0.1)",
   },
   timelineConnector: {
     width: 2,
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.border,
     marginTop: 5,
     marginBottom: -25,
   },
   placeCard: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 12,
     marginLeft: 10,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   placeImg: {
     width: 64,
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   placeName: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 6,
@@ -385,10 +385,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   metaText: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: "600",
     marginLeft: 5,
+    opacity: 0.6,
   },
   detailsIcon: {
     padding: 10,
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
   startButton: {
     borderRadius: 24,
     overflow: "hidden",
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
   },
   startText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontSize: 16,
     fontWeight: "900",
     letterSpacing: 1,

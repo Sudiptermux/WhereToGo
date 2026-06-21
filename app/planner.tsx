@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,13 +18,37 @@ import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip, Place } from "../context/TripContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Polyline, UrlTile, PROVIDER_GOOGLE } from "react-native-maps";
+import { useTheme } from "../context/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
+const DARK_MAP_STYLE = [
+  { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
+  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
+];
+
+const LIGHT_MAP_STYLE = [
+  { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e3f2fd" }] }
+];
+
 export default function RoutePlannerScreen() {
   const router = useRouter();
-  const { selectedPlaces, removeFromTrip, stayLocation, setStayLocation, numberOfDays, setNumberOfDays, userProfile } = useTrip();
+  const { 
+    selectedPlaces, 
+    removeFromTrip, 
+    stayLocation, 
+    setStayLocation, 
+    numberOfDays, 
+    setNumberOfDays, 
+    startDate,
+    setStartDate,
+    userProfile 
+  } = useTrip();
+  const { colors, isDark } = useTheme();
   
   const [showStayHub, setShowStayHub] = useState(false);
   const [isMapPicking, setIsMapPicking] = useState(false);
@@ -36,6 +60,22 @@ export default function RoutePlannerScreen() {
   const [tempCoords, setTempCoords] = useState({ latitude: 20.2450, longitude: 85.8200 });
   const [isMapExpanded, setIsMapExpanded] = useState(false);
 
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
+  const dateRangeDisplay = useMemo(() => {
+    const end = new Date(startDate);
+    end.setDate(startDate.getDate() + (numberOfDays - 1));
+    return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  }, [startDate, numberOfDays]);
+
+  const dateOptions = useMemo(() => {
+    return Array.from({ length: 14 }).map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        return d;
+    });
+  }, []);
+
   const INITIAL_REGION = {
     latitude: 20.2450,
     longitude: 85.8200,
@@ -43,7 +83,44 @@ export default function RoutePlannerScreen() {
     longitudeDelta: 0.1,
   };
 
-  // Real-time Nominatim Search
+  const [roadPath, setRoadPath] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (selectedPlaces.length < 2) {
+      setRoadPath([]);
+      return;
+    }
+
+    const fetchRoadPath = async () => {
+      try {
+        const coords = selectedPlaces.map(p => 
+          `${p.lng || p.coordinates?.longitude},${p.lat || p.coordinates?.latitude}`
+        ).join(';');
+        
+        const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.routes && data.routes[0]) {
+          const points = data.routes[0].geometry.coordinates.map((coord: any) => ({
+            latitude: coord[1],
+            longitude: coord[0]
+          }));
+          setRoadPath(points);
+        }
+      } catch (e) {
+        console.error("Routing error:", e);
+        const fallback = selectedPlaces.map(p => ({
+            latitude: p.lat || p.coordinates?.latitude || 0,
+            longitude: p.lng || p.coordinates?.longitude || 0
+        }));
+        setRoadPath(fallback);
+      }
+    };
+
+    fetchRoadPath();
+  }, [selectedPlaces]);
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (staySearch.length > 2) {
@@ -59,7 +136,6 @@ export default function RoutePlannerScreen() {
   const performHotelSearch = async () => {
     setIsSearching(true);
     try {
-      // Searching for hotels in/near Bhubaneswar
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=hotel+in+bhubaneswar+${staySearch}&limit=5&addressdetails=1`;
       const response = await fetch(url, { headers: { 'User-Agent': 'WhereToGo_App' } });
       const data = await response.json();
@@ -101,7 +177,7 @@ export default function RoutePlannerScreen() {
       title: hotel.display_name.split(",")[0],
       location: hotel.display_name,
       description: "Selected Hotel",
-      image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500", // Generic hotel image
+      image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500", 
       likes: "N/A",
       lat: parseFloat(hotel.lat),
       lng: parseFloat(hotel.lon)
@@ -113,7 +189,6 @@ export default function RoutePlannerScreen() {
   const handleMapConfirm = async () => {
     setIsSearching(true);
     try {
-      // Reverse geocode to get an address for the picked point
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${tempCoords.latitude}&lon=${tempCoords.longitude}`;
       const response = await fetch(url, { headers: { 'User-Agent': 'WhereToGo_App' } });
       const data = await response.json();
@@ -123,7 +198,7 @@ export default function RoutePlannerScreen() {
         title: data.name || data.address.road || "Custom Location",
         location: data.display_name,
         description: "Custom Picked Location",
-        image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500", // City/Home feel image
+        image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500", 
         likes: "N/A",
         lat: tempCoords.latitude,
         lng: tempCoords.longitude
@@ -141,13 +216,31 @@ export default function RoutePlannerScreen() {
     return (
         <View style={styles.container}>
             <MapView
-                provider={PROVIDER_GOOGLE}
                 style={styles.fullMap}
+                provider={PROVIDER_GOOGLE}
+                customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
                 initialRegion={INITIAL_REGION}
-                customMapStyle={DARK_MAP_STYLE}
                 onRegionChangeComplete={(r: any) => setTempCoords({ latitude: r.latitude, longitude: r.longitude })}
-            />
-            {/* Crosshair Overlay */}
+            >
+                {roadPath.length > 0 && (
+                    <Polyline
+                        coordinates={roadPath}
+                        strokeColor={colors.primary}
+                        strokeWidth={4}
+                        lineDashPattern={[5, 5]}
+                    />
+                )}
+
+                {selectedPlaces.map(p => (
+                    <Marker 
+                        key={`pick-${p.id}`} 
+                        coordinate={{ 
+                            latitude: p.lat || p.coordinates?.latitude || INITIAL_REGION.latitude, 
+                            longitude: p.lng || p.coordinates?.longitude || INITIAL_REGION.longitude 
+                        }} 
+                    />
+                ))}
+            </MapView>
             <View style={styles.crosshairContainer} pointerEvents="none">
                 <View style={styles.crosshairCircle}>
                     <View style={styles.crosshairDot} />
@@ -157,7 +250,7 @@ export default function RoutePlannerScreen() {
 
             <SafeAreaView style={styles.mapControls}>
                 <TouchableOpacity style={styles.mapCancel} onPress={() => setIsMapPicking(false)}>
-                    <Ionicons name="close" size={24} color="#fff" />
+                    <Ionicons name="close" size={24} color={isDark ? "#fff" : colors.text} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.mapConfirm} onPress={handleMapConfirm}>
                     <Text style={styles.mapConfirmText}>Pick This Location</Text>
@@ -173,7 +266,7 @@ export default function RoutePlannerScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       
       {/* Header */}
       <SafeAreaView style={styles.header}>
@@ -185,25 +278,25 @@ export default function RoutePlannerScreen() {
               router.replace("/discovery");
             }
           }}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Your Trip Plan</Text>
             <View style={styles.subHeaderRow}>
                 <View style={[styles.statusDot, { backgroundColor: "#FF9800" }]} />
-                <Text style={styles.headerSubtitle}>Bhubaneswar, India • Oct 12 - Oct 15</Text>
+                <Text style={styles.headerSubtitle}>{stayLocation?.location_display?.split(',')[0] || "Destination"} • {dateRangeDisplay}</Text>
             </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerIcon}>
-                <Ionicons name="notifications-outline" size={24} color="#fff" />
+                <Ionicons name="notifications-outline" size={24} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
                 {userProfile.avatar ? (
                     <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
                 ) : (
-                    <View style={[styles.avatar, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="person" size={20} color="rgba(255,255,255,0.3)" />
+                    <View style={[styles.avatar, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="person" size={20} color={colors.textSecondary} />
                     </View>
                 )}
             </TouchableOpacity>
@@ -218,7 +311,7 @@ export default function RoutePlannerScreen() {
           {selectedPlaces.map((place, index) => (
             <View key={place.id} style={styles.destinationCardContainer}>
                  <View style={styles.cardHeader}>
-                    <MaterialCommunityIcons name="dots-vertical" size={24} color="#444" />
+                    <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.border} />
                     <View style={styles.placeCard}>
                         <Image 
                             source={typeof place.image === 'string' ? { uri: place.image } : place.image} 
@@ -227,12 +320,12 @@ export default function RoutePlannerScreen() {
                         <View style={styles.placeInfo}>
                             <Text style={styles.placeTitle}>{place.title}</Text>
                             <View style={styles.durationRow}>
-                                <Feather name="clock" size={14} color="#aaa" />
+                                <Feather name="clock" size={14} color={colors.textSecondary} />
                                 <Text style={styles.durationText}>2 HOURS</Text>
                             </View>
                         </View>
                         <TouchableOpacity style={styles.deleteButton} onPress={() => removeFromTrip(place.id)}>
-                            <Feather name="trash-2" size={20} color="#666" />
+                            <Feather name="trash-2" size={20} color={colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
                  </View>
@@ -261,14 +354,14 @@ export default function RoutePlannerScreen() {
             style={[styles.staySelectorCard, stayLocation && styles.activeStayCard]}
             onPress={() => setShowStayHub(!showStayHub)}
         >
-            <View style={[styles.stayIconContainer, { backgroundColor: stayLocation ? "#00bcd4" : "#1a1a1a" }]}>
-                <MaterialCommunityIcons name="home-city-outline" size={24} color={stayLocation ? "#000" : "#555"} />
+            <View style={[styles.stayIconContainer, { backgroundColor: stayLocation ? colors.primary : colors.surface }]}>
+                <MaterialCommunityIcons name="home-city-outline" size={24} color={stayLocation ? (isDark ? "#000" : "#fff") : colors.textSecondary} />
             </View>
             <View style={styles.stayInfo}>
                 <Text style={styles.stayLabel}>Stay Location</Text>
                 <Text style={styles.stayValue} numberOfLines={1}>{stayLocation?.title || "Not selected yet"}</Text>
             </View>
-            <Ionicons name={showStayHub ? "chevron-up" : "chevron-forward"} size={20} color="#555" />
+            <Ionicons name={showStayHub ? "chevron-up" : "chevron-forward"} size={20} color={colors.textSecondary} />
         </TouchableOpacity>
 
         {showStayHub && (
@@ -292,17 +385,17 @@ export default function RoutePlannerScreen() {
 
                 {/* 2. Map Pick */}
                 <TouchableOpacity style={styles.hubActionItem} onPress={() => setIsMapPicking(true)}>
-                    <Ionicons name="map-outline" size={20} color="#00bcd4" />
+                    <Ionicons name="map-outline" size={20} color={colors.primary} />
                     <Text style={styles.hubActionText}>Pick from Map (Home)</Text>
                 </TouchableOpacity>
 
                 {/* 3. Search */}
                 <View style={styles.searchContainer}>
-                    {isSearching ? <ActivityIndicator size="small" color="#00bcd4" /> : <Ionicons name="search" size={20} color="#555" />}
+                    {isSearching ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="search" size={20} color={colors.textSecondary} />}
                     <TextInput 
                         style={styles.staySearchInput}
                         placeholder="Search Bhubaneswar Hotels..."
-                        placeholderTextColor="#444"
+                        placeholderTextColor={colors.textSecondary}
                         value={staySearch}
                         onChangeText={setStaySearch}
                     />
@@ -316,7 +409,7 @@ export default function RoutePlannerScreen() {
                                 style={styles.searchResultItem}
                                 onPress={() => handleSelectHotel(hotel)}
                             >
-                                <Ionicons name="business-outline" size={18} color="#00bcd4" />
+                                <Ionicons name="business-outline" size={18} color={colors.primary} />
                                 <View style={{ marginLeft: 12, flex: 1 }}>
                                     <Text style={styles.resultTitle} numberOfLines={1}>{hotel.display_name.split(",")[0]}</Text>
                                     <Text style={styles.resultAddress} numberOfLines={1}>{hotel.display_name}</Text>
@@ -327,6 +420,30 @@ export default function RoutePlannerScreen() {
                 )}
             </View>
         )}
+
+        {/* Starting Date Selector */}
+        <View style={styles.dateSelector}>
+            <Text style={styles.sectionLabel}>Starting Date</Text>
+            <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={dateOptions}
+                keyExtractor={(item) => item.toISOString()}
+                contentContainerStyle={styles.dateList}
+                renderItem={({ item }) => {
+                    const isSelected = item.toDateString() === startDate.toDateString();
+                    return (
+                        <TouchableOpacity 
+                            style={[styles.dateItem, isSelected && styles.activeDateItem]}
+                            onPress={() => setStartDate(item)}
+                        >
+                            <Text style={[styles.dateDay, isSelected && styles.activeDateText]}>{item.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                            <Text style={[styles.dateNum, isSelected && styles.activeDateText]}>{item.getDate()}</Text>
+                        </TouchableOpacity>
+                    );
+                }}
+            />
+        </View>
 
         {/* Day count constraint */}
         <View style={styles.daySelector}>
@@ -358,7 +475,7 @@ export default function RoutePlannerScreen() {
                         style={styles.expandButton} 
                         onPress={() => setIsMapExpanded(!isMapExpanded)}
                     >
-                        <Ionicons name={isMapExpanded ? "contract" : "expand"} size={20} color="#00bcd4" />
+                        <Ionicons name={isMapExpanded ? "contract" : "expand"} size={20} color={colors.primary} />
                     </TouchableOpacity>
                  </View>
             </View>
@@ -366,19 +483,25 @@ export default function RoutePlannerScreen() {
                 <MapView
                     ref={mapRef}
                     provider={PROVIDER_GOOGLE}
+                    customMapStyle={isDark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE}
                     style={styles.miniMap}
                     initialRegion={INITIAL_REGION}
-                    customMapStyle={DARK_MAP_STYLE}
                     scrollEnabled={isMapExpanded}
                     zoomEnabled={isMapExpanded}
                 >
+                    {roadPath.length > 0 && (
+                        <Polyline
+                            coordinates={roadPath}
+                            strokeColor={colors.primary}
+                            strokeWidth={3}
+                        />
+                    )}
                     {stayLocation && (
                         <Marker 
                             coordinate={{ 
                               latitude: stayLocation.lat || stayLocation.coordinates?.latitude || INITIAL_REGION.latitude, 
                               longitude: stayLocation.lng || stayLocation.coordinates?.longitude || INITIAL_REGION.longitude 
                             }} 
-                            pinColor="#ff9800" 
                         />
                     )}
                     {selectedPlaces.map(p => (
@@ -404,12 +527,12 @@ export default function RoutePlannerScreen() {
             onPress={() => router.push("/loader")}
         >
             <LinearGradient
-                colors={["#00F2FE", "#4FACFE"]}
+                colors={isDark ? ["#00F2FE", "#4FACFE"] : [colors.primary, "#81ecec"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.optimizeGradient}
             >
-                <MaterialCommunityIcons name="auto-fix" size={24} color="#000" />
+                <MaterialCommunityIcons name="auto-fix" size={24} color={isDark ? "#000" : "#fff"} />
                 <Text style={styles.optimizeText}>OPTIMIZE ROUTE</Text>
             </LinearGradient>
         </TouchableOpacity>
@@ -418,19 +541,13 @@ export default function RoutePlannerScreen() {
   );
 }
 
-const DARK_MAP_STYLE = [
-  { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
-  { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
-];
-
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
   },
   header: {
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
     paddingBottom: 20,
   },
   headerContent: {
@@ -444,7 +561,7 @@ const styles = StyleSheet.create({
     marginLeft: 20,
   },
   headerTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 28,
     fontWeight: "900",
   },
@@ -460,9 +577,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerSubtitle: {
-    color: "rgba(255,255,255,0.5)",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "600",
+    opacity: 0.6,
   },
   headerIcon: {
     marginRight: 15,
@@ -494,13 +612,18 @@ const styles = StyleSheet.create({
   placeCard: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 12,
     marginLeft: 10,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   placeImage: {
     width: 70,
@@ -512,7 +635,7 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   placeTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
     marginBottom: 6,
@@ -522,7 +645,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   durationText: {
-    color: "#666",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
     marginLeft: 6,
@@ -533,7 +656,7 @@ const styles = StyleSheet.create({
   connector: {
     width: 2,
     height: 30,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.border,
     marginLeft: 11,
     marginVertical: -5,
   },
@@ -543,7 +666,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: colors.border,
     borderRadius: 24,
     paddingVertical: 25,
     marginTop: 15,
@@ -552,13 +675,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   addText: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 12,
     fontWeight: "900",
     letterSpacing: 2,
@@ -567,23 +690,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 20,
     fontWeight: "800",
   },
   staySelectorCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     padding: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
     marginBottom: 15,
   },
   activeStayCard: {
-    borderColor: "#00bcd4",
-    backgroundColor: "rgba(0, 188, 212, 0.05)",
+    borderColor: colors.primary,
+    backgroundColor: isDark ? "rgba(0, 188, 212, 0.05)" : "rgba(0, 188, 212, 0.02)",
   },
   stayIconContainer: {
     width: 50,
@@ -597,36 +720,43 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   stayLabel: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     marginBottom: 2,
+    opacity: 0.6,
   },
   stayValue: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 15,
     fontWeight: "700",
   },
   stayHubContent: {
-    backgroundColor: "#0d0d0d",
+    backgroundColor: colors.surface,
     padding: 20,
     borderRadius: 24,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "rgba(0, 188, 212, 0.4)",
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
   },
   hubSubTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 20,
   },
   hubCategory: {
-    color: "#444",
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1,
     marginBottom: 15,
+    opacity: 0.5,
   },
   proximityList: {
     marginBottom: 20,
@@ -643,7 +773,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   proximityText: {
-    color: "rgba(255,255,255,0.6)",
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: "600",
     textAlign: "center",
@@ -651,15 +781,15 @@ const styles = StyleSheet.create({
   hubActionItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 188, 212, 0.05)",
+    backgroundColor: isDark ? "rgba(0, 188, 212, 0.05)" : "rgba(0, 188, 212, 0.03)",
     padding: 15,
     borderRadius: 15,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "rgba(0, 188, 212, 0.1)",
+    borderColor: isDark ? "rgba(0, 188, 212, 0.1)" : "rgba(0, 188, 212, 0.05)",
   },
   hubActionText: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 14,
     fontWeight: "700",
     marginLeft: 12,
@@ -667,15 +797,17 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.background,
     paddingHorizontal: 15,
     borderRadius: 15,
     height: 50,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   staySearchInput: {
     flex: 1,
     marginLeft: 10,
-    color: "#fff",
+    color: colors.text,
     fontSize: 14,
   },
   searchResultsContainer: {
@@ -687,24 +819,72 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.05)",
+    borderBottomColor: colors.border,
   },
   resultTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 14,
     fontWeight: "700",
   },
   resultAddress: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 11,
     marginTop: 2,
+    opacity: 0.6,
+  },
+  dateSelector: {
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  sectionLabel: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 15,
+  },
+  dateList: {
+    paddingRight: 20,
+  },
+  dateItem: {
+    width: 65,
+    height: 85,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  activeDateItem: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dateDay: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  dateNum: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  activeDateText: {
+    color: isDark ? "#000" : "#fff",
   },
   daySelector: {
     marginTop: 10,
     marginBottom: 30,
   },
   dayLabel: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 15,
@@ -717,30 +897,30 @@ const styles = StyleSheet.create({
     width: (width - 80) / 5,
     height: 50,
     borderRadius: 15,
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
   },
   activeDayButton: {
-    backgroundColor: "#00bcd410",
-    borderColor: "#00bcd4",
+    backgroundColor: isDark ? "rgba(0, 188, 212, 0.1)" : "rgba(0, 188, 212, 0.05)",
+    borderColor: colors.primary,
   },
   dayButtonText: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 16,
     fontWeight: "800",
   },
   activeDayButtonText: {
-    color: "#00bcd4",
+    color: colors.primary,
   },
   mapPreviewContainer: {
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 30,
     padding: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
   },
   previewHeader: {
     flexDirection: "row",
@@ -749,18 +929,18 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   previewTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
   },
   previewBadge: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   previewBadgeText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontSize: 10,
     fontWeight: "900",
   },
@@ -773,11 +953,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: colors.border,
   },
   miniMap: {
     ...StyleSheet.absoluteFillObject,
@@ -798,20 +978,32 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 15,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   mapConfirm: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     paddingHorizontal: 25,
     paddingVertical: 14,
     borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
   mapConfirmText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontWeight: "900",
     fontSize: 14,
   },
@@ -825,34 +1017,41 @@ const styles = StyleSheet.create({
       height: 60,
       borderRadius: 30,
       borderWidth: 2,
-      borderColor: "#00bcd4",
+      borderColor: colors.primary,
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: "rgba(0, 188, 212, 0.1)",
+      backgroundColor: isDark ? "rgba(0, 188, 212, 0.1)" : "rgba(0, 188, 212, 0.05)",
   },
   crosshairDot: {
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: "#00bcd4",
+      backgroundColor: colors.primary,
   },
   pinTip: {
     width: 2,
     height: 30,
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     marginTop: -2,
   },
   mapHint: {
       position: "absolute",
       bottom: 100,
       alignSelf: "center",
-      backgroundColor: "rgba(0,0,0,0.8)",
+      backgroundColor: colors.surface,
       paddingHorizontal: 20,
       paddingVertical: 12,
       borderRadius: 30,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 5,
   },
   mapHintText: {
-      color: "#fff",
+      color: colors.text,
       fontSize: 12,
       fontWeight: "700",
   },
@@ -868,7 +1067,7 @@ const styles = StyleSheet.create({
   optimizeButton: {
     borderRadius: 24,
     overflow: "hidden",
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -881,10 +1080,11 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
   },
   optimizeText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontSize: 18,
     fontWeight: "900",
     marginLeft: 12,
     letterSpacing: 1,
   },
 });
+;

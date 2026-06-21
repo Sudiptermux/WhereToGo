@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,18 +16,21 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTrip, Place } from "../context/TripContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function JourneyScreen() {
   const router = useRouter();
   const { optimizedJourney, visitedPlaces, toggleVisited, stayLocation, saveActiveTrip, userProfile, clearTrip } = useTrip();
+  const { colors, isDark } = useTheme();
   const [activeDay, setActiveDay] = useState(1);
+
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const currentDayPlan = optimizedJourney.find(d => d.day === activeDay) || { day: 1, places: [] };
   const totalStops = optimizedJourney.reduce((acc, d) => acc + d.places.length, 0);
   
-  // Filter visited places to only include those in the current trip to avoid overflow (e.g. 11/10)
   const allTripPlaceIds = optimizedJourney.flatMap(d => d.places.map(p => p.id));
   const visitedStopsCount = visitedPlaces.filter(id => allTripPlaceIds.includes(id)).length;
   const progressPercent = totalStops > 0 ? (visitedStopsCount / totalStops) * 100 : 0;
@@ -41,28 +44,28 @@ export default function JourneyScreen() {
   const handleSave = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Success);
     await saveActiveTrip();
-    clearTrip(); // Reset selection so a new trip can be planned
+    clearTrip(); 
     router.replace("/(tabs)/saved");
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#060606", "#101010"]} style={styles.background}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <View style={styles.background}>
         
         {/* Progress Header */}
         <SafeAreaView style={styles.header}>
             <View style={styles.topRow}>
                 <TouchableOpacity onPress={() => router.replace("/planner")}>
-                    <Ionicons name="close" size={28} color="#fff" />
+                    <Ionicons name="close" size={28} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Active Journey</Text>
                 <TouchableOpacity style={styles.avatarContainer} onPress={() => router.push("/(tabs)/profile")}>
                     {userProfile.avatar ? (
                         <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
                     ) : (
-                        <View style={[styles.avatar, { backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Ionicons name="person" size={20} color="rgba(255,255,255,0.3)" />
+                        <View style={[styles.avatar, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name="person" size={20} color={colors.textSecondary} />
                         </View>
                     )}
                 </TouchableOpacity>
@@ -74,7 +77,7 @@ export default function JourneyScreen() {
                     <Text style={styles.progressValue}>{visitedStopsCount}/{totalStops} STOPS</Text>
                 </View>
                 <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+                    <View style={[styles.progressFill, { width: `${progressPercent}%`, backgroundColor: colors.primary }]} />
                 </View>
             </View>
         </SafeAreaView>
@@ -102,7 +105,7 @@ export default function JourneyScreen() {
             <View style={styles.waypointContainer}>
                 <View style={styles.connectorContainer}>
                     <View style={[styles.node, { backgroundColor: "#ff9800", borderColor: "rgba(255,152,0,0.2)" }]}>
-                        <Ionicons name="home" size={14} color="#000" />
+                        <Ionicons name="home" size={14} color="#fff" />
                     </View>
                     <View style={styles.routeLine} />
                 </View>
@@ -124,7 +127,7 @@ export default function JourneyScreen() {
                                 <View style={styles.transitIndicator}>
                                     <View style={styles.transitLine} />
                                     <View style={styles.transitLabel}>
-                                        <Feather name="trending-up" size={8} color="#00bcd4" />
+                                        <Feather name="trending-up" size={8} color={colors.primary} />
                                         <Text style={styles.transitText}>{place.travelTimeMinutes}m drive</Text>
                                     </View>
                                 </View>
@@ -135,7 +138,7 @@ export default function JourneyScreen() {
                                 !isVisited && styles.upcomingNode
                             ]}>
                                 {isVisited ? (
-                                    <Ionicons name="checkmark" size={14} color="#000" />
+                                    <Ionicons name="checkmark" size={14} color={isDark ? "#000" : "#fff"} />
                                 ) : (
                                     <Text style={styles.nodeIndex}>{index + 1}</Text>
                                 )}
@@ -157,7 +160,7 @@ export default function JourneyScreen() {
                                 </View>
                                 
                                 <View style={styles.metaRow}>
-                                    <Feather name="clock" size={12} color="#00bcd4" />
+                                    <Feather name="clock" size={12} color={colors.primary} />
                                     <Text style={styles.metaLabel}>{place.avg_duration_mins || 120} min visit</Text>
                                 </View>
 
@@ -166,7 +169,7 @@ export default function JourneyScreen() {
                                         style={styles.navButton}
                                         onPress={() => handleNavigate(place)}
                                     >
-                                        <MaterialCommunityIcons name="google-maps" size={16} color="#000" />
+                                        <MaterialCommunityIcons name="google-maps" size={16} color={isDark ? "#000" : "#fff"} />
                                         <Text style={styles.navButtonText}>Let's Go</Text>
                                     </TouchableOpacity>
                                     
@@ -198,7 +201,7 @@ export default function JourneyScreen() {
                         </View>
                     )}
                     <View style={[styles.node, styles.endNode]}>
-                        <Ionicons name="flag" size={14} color="#000" />
+                        <Ionicons name="flag" size={14} color={isDark ? "#000" : "#fff"} />
                     </View>
                 </View>
                 <View style={styles.endCard}>
@@ -214,19 +217,19 @@ export default function JourneyScreen() {
         <View style={styles.footer}>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                 <Text style={styles.saveBtnText}>Save Trip to Curation</Text>
-                <Ionicons name="bookmark" size={18} color="#000" />
+                <Ionicons name="bookmark" size={18} color={isDark ? "#000" : "#fff"} />
             </TouchableOpacity>
         </View>
 
-      </LinearGradient>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: colors.background,
   },
   background: {
     flex: 1,
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   headerTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
   },
@@ -251,7 +254,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: colors.border,
     padding: 2,
   },
   avatar: {
@@ -260,11 +263,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   progressContainer: {
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     padding: 20,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   progressTextRow: {
     flexDirection: "row",
@@ -272,25 +280,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   progressLabel: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
+    opacity: 0.6,
   },
   progressValue: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 12,
     fontWeight: "900",
   },
   progressBar: {
     height: 6,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.border,
     borderRadius: 3,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#00bcd4",
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowRadius: 10,
     shadowOpacity: 0.5,
   },
@@ -306,19 +314,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     marginRight: 10,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   activeTab: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   tabText: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "900",
     letterSpacing: 1,
   },
   activeTabText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
   },
   journeyScroll: {
     paddingHorizontal: 20,
@@ -326,7 +337,7 @@ const styles = StyleSheet.create({
   },
   waypointContainer: {
     flexDirection: "row",
-    minHeight: 140, // Increased for better spacing
+    minHeight: 140, 
   },
   connectorContainer: {
     width: 40,
@@ -342,19 +353,19 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   upcomingNode: {
-    backgroundColor: "#060606",
-    borderColor: "#222",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   visitedNode: {
-    backgroundColor: "#00bcd4",
-    borderColor: "rgba(0,188,212,0.2)",
+    backgroundColor: colors.primary,
+    borderColor: isDark ? "rgba(0,188,212,0.2)" : "rgba(0,188,212,0.1)",
   },
   endNode: {
-    backgroundColor: "#fff",
+    backgroundColor: isDark ? "#fff" : colors.text,
     borderColor: "rgba(255,152,0,0.2)",
   },
   nodeIndex: {
-    color: "#444",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -363,10 +374,10 @@ const styles = StyleSheet.create({
     top: 28,
     width: 2,
     bottom: 0,
-    backgroundColor: "#222",
+    backgroundColor: colors.border,
   },
   visitedLine: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
   },
   infoCard: {
     flex: 1,
@@ -381,29 +392,35 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   waypointTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
   },
   waypointSub: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
+    opacity: 0.8,
   },
   destinationCard: {
     flex: 1,
     flexDirection: "row",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     marginLeft: 15,
     borderRadius: 24,
     padding: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   visitedCard: {
     opacity: 0.5,
-    borderColor: "#00bcd4",
+    borderColor: colors.primary,
   },
   destImage: {
     width: 80,
@@ -420,57 +437,63 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metaLabel: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     marginLeft: 6,
   },
   destTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 17,
     fontWeight: "800",
     flex: 1,
   },
+  destHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   transitIndicator: {
     position: 'absolute',
-    top: -95, // Shifted much higher up the line
+    top: -95, 
     left: 0,
     right: 0,
     alignItems: 'center',
     height: 40,
-    zIndex: 5, // Higher to ensure visibility
+    zIndex: 5, 
     justifyContent: 'center',
   },
   transitLine: {
     width: 1,
     height: '100%',
-    backgroundColor: 'transparent', // Hide internal line, let external line show
+    backgroundColor: 'transparent',
   },
   transitLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#121212', // Slightly matched to cards for premium feel
+    backgroundColor: colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
   },
   transitText: {
-    color: '#00bcd4',
+    color: colors.primary,
     fontSize: 10,
     fontWeight: '900',
     marginLeft: 5,
     letterSpacing: 0.5,
   },
   timeBadge: {
-    backgroundColor: "rgba(0,188,212,0.1)",
+    backgroundColor: isDark ? "rgba(0,188,212,0.1)" : "rgba(0,188,212,0.05)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   timeText: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 10,
     fontWeight: "800",
   },
@@ -481,13 +504,13 @@ const styles = StyleSheet.create({
   navButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: isDark ? "#fff" : colors.text,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
   },
   navButtonText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontSize: 12,
     fontWeight: "800",
     marginLeft: 6,
@@ -497,19 +520,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: colors.border,
   },
   checkedInButton: {
-    borderColor: "#00bcd4",
-    backgroundColor: "rgba(0,188,212,0.1)",
+    borderColor: colors.primary,
+    backgroundColor: isDark ? "rgba(0,188,212,0.1)" : "rgba(0,188,212,0.05)",
   },
   checkInText: {
-    color: "white",
+    color: colors.text,
     fontSize: 12,
     fontWeight: "700",
   },
   checkedInText: {
-    color: "#00bcd4",
+    color: colors.primary,
   },
   endCard: {
     flex: 1,
@@ -517,14 +540,15 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   endTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
   },
   endSub: {
-    color: "rgba(255,255,255,0.7)",
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
+    opacity: 0.8,
   },
   footer: {
     position: "absolute",
@@ -536,18 +560,18 @@ const styles = StyleSheet.create({
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 30,
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
   },
   saveBtnText: {
-    color: "#000",
+    color: isDark ? "#000" : "#fff",
     fontSize: 14,
     fontWeight: "900",
     marginRight: 10,
