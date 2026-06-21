@@ -160,22 +160,7 @@ export default function LoginScreen() {
                 </Text>
             </TouchableOpacity>
 
-            <View style={styles.dividerContainer}>
-                <View style={styles.line} />
-                <Text style={styles.dividerText}>OR SIGN IN WITH</Text>
-                <View style={styles.line} />
-            </View>
 
-            <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialButton}>
-                    <Ionicons name="logo-google" size={20} color={colors.text} />
-                    <Text style={styles.socialText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                    <Ionicons name="logo-apple" size={22} color={colors.text} />
-                    <Text style={styles.socialText}>Apple</Text>
-                </TouchableOpacity>
-            </View>
 
             <TouchableOpacity
                 onPress={() => router.push("/signup")}
@@ -317,48 +302,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
   },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 35,
-    width: "100%",
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    marginHorizontal: 15,
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-    opacity: 0.5,
-  },
-  socialRow: {
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  socialButton: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-    width: "48%",
-    height: 56,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  socialText: {
-    color: colors.text,
-    fontWeight: "700",
-    marginLeft: 10,
-    fontSize: 15,
-  },
+
   createAccount: {
     alignItems: "center",
     marginBottom: 40,
