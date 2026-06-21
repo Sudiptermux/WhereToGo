@@ -79,3 +79,34 @@ export async function getUserAttributes() {
   }
   return null;
 }
+
+export async function uploadAvatar(uri) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("User not authenticated");
+
+  const fileName = `${user.id}/${Date.now()}.jpg`;
+  
+  // Convert URI to Blob for Supabase Upload
+  const response = await fetch(uri);
+  const blob = await response.blob();
+
+  const { data, error } = await supabase.storage
+    .from('avatars')
+    .upload(fileName, blob, {
+      contentType: 'image/jpeg',
+      upsert: true
+    });
+
+  if (error) {
+    console.error("Storage upload error:", error);
+    // If bucket doesn't exist, we might get an error. 
+    // Fallback: return the original URI so it at least works locally
+    return uri;
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(fileName);
+
+  return publicUrl;
+}

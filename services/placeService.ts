@@ -1,5 +1,19 @@
 import { supabase } from "./supabaseClient";
 
+// Haversine formula to calculate distance between two coordinates in km
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 999;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
 /**
  * Helper to transform Supabase objects to match the expected UI schema.
  */
@@ -51,7 +65,12 @@ export const normalizePlace = (p: any) => {
     };
 };
 
+let popularCache: any[] = [];
+
 export const placeService = {
+  clearPopularCache() {
+    popularCache = [];
+  },
   /**
    * Fetch by UUID
    */
@@ -98,24 +117,72 @@ export const placeService = {
     return await this.getPlaceBySlug(identifier);
   },
 
-  async getRandomPlaces(limit = 4) {
+  async getHandpicked(limit = 4) {
     const { data, error } = await supabase
         .from('places')
         .select('*')
+        .order('rating', { ascending: false })
         .limit(limit);
         
     if (error) return [];
     return (data || []).map(normalizePlace);
   },
 
+  async getTrending(limit = 5) {
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+        
+    if (error) return [];
+    return (data || []).map(normalizePlace);
+  },
+
+  async getPopular(limit = 5) {
+    if (popularCache.length > 0) {
+      return popularCache.slice(0, limit);
+    }
+
+    // Shuffling on the frontend for variety since Supabase doesn't support 'RANDOM()' easily in simple JS queries
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .limit(15); // Fetch a larger set
+        
+    if (error) return [];
+    const normalized = (data || []).map(normalizePlace);
+    const shuffled = normalized.sort(() => 0.5 - Math.random());
+    popularCache = shuffled; // Store in cache for consistency across pages
+    return shuffled.slice(0, limit);
+  },
+
   async searchPlaces(query: string) {
     const { data, error } = await supabase
         .from('places')
         .select('*')
-        .or(`title.ilike.%${query}%,location.ilike.%${query}%,slug.ilike.%${query}%`);
+        .or(`title.ilike.%${query}%,location.ilike.%${query}%,slug.ilike.%${query}%,category.ilike.%${query}%`);
 
     if (error) return [];
     return (data || []).map(normalizePlace);
+  },
+
+  async getNearestPlaces(lat: number, lng: number, limit = 5) {
+    const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .limit(50); // Fetch a pool to find nearest
+
+    if (error) return [];
+
+    const withDistance = (data || []).map(place => ({
+        ...normalizePlace(place),
+        distance: getDistance(lat, lng, place.lat, place.lng)
+    }));
+
+    return withDistance
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, limit);
   },
 
   async getPlaceWithAreaMates(identifier: string) {
