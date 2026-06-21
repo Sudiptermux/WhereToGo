@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   Dimensions,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,12 +21,14 @@ import { useTrip, Place } from "../context/TripContext";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { optimizeRoute } from "../services/routeEngine";
+import { useTheme } from "../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function OptimizationLoaderScreen() {
   const router = useRouter();
   const { selectedPlaces, stayLocation, numberOfDays, setOptimizedJourney } = useTrip();
+  const { colors, isDark } = useTheme();
   
   const [statusIndex, setStatusIndex] = useState(0);
   const [percent, setPercent] = useState(0);
@@ -34,6 +37,8 @@ export default function OptimizationLoaderScreen() {
   const orbitRotation = useSharedValue(0);
   const progressWidth = useSharedValue(0);
   const cardOpacity = useSharedValue(0);
+
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const statuses = [
     "Analyzing local transit patterns",
@@ -45,13 +50,11 @@ export default function OptimizationLoaderScreen() {
   ];
 
   useEffect(() => {
-    // 1. Initial Animations
     sparkleScale.value = withRepeat(withTiming(1.2, { duration: 1200 }), -1, true);
     orbitRotation.value = withRepeat(withTiming(360, { duration: 3000, easing: Easing.linear }), -1);
     progressWidth.value = withTiming(100, { duration: 6000 });
     cardOpacity.value = withTiming(1, { duration: 800 });
 
-    // 2. Percentage Ticker logic to match image
     const interval = setInterval(() => {
         setPercent(prev => {
             if (prev < 100) return prev + 1;
@@ -59,27 +62,19 @@ export default function OptimizationLoaderScreen() {
         });
     }, 60);
 
-    // 3. Status Rotator matches the speed of optimization
     const statusInterval = setInterval(() => {
       setStatusIndex((prev) => (prev + 1) % statuses.length);
     }, 950);
 
-    // 4. REAL LOGIC: Trigger the new Engine
     const performOptimization = () => {
       if (selectedPlaces.length === 0) return;
-
       const { journey, message } = optimizeRoute(selectedPlaces, stayLocation, numberOfDays);
       setOptimizedJourney(journey);
-      
-      if (message) {
-        console.log("[Engine Notice]:", message);
-        // We could show this message in the UI eventually
-      }
+      if (message) console.log("[Engine Notice]:", message);
     };
     
     performOptimization();
 
-    // 5. Navigate
     const timer = setTimeout(() => {
       if (selectedPlaces.length === 0) {
         alert("Please select at least one place to optimize!");
@@ -115,10 +110,10 @@ export default function OptimizationLoaderScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={styles.header}>
             <View style={styles.logoRow}>
-                <Ionicons name="search" size={20} color="#00bcd4" />
+                <Ionicons name="search" size={20} color={colors.primary} />
                 <Text style={styles.logoText}>WHERETOGO</Text>
             </View>
       </SafeAreaView>
@@ -130,7 +125,7 @@ export default function OptimizationLoaderScreen() {
             <View style={styles.widgetBorder}>
                 <View style={styles.widgetInner}>
                     <Animated.View style={sparkleStyle}>
-                        <Ionicons name="sparkles" size={54} color="#00bcd4" />
+                        <Ionicons name="sparkles" size={54} color={colors.primary} />
                     </Animated.View>
                     <Animated.View style={[styles.orbitContainer, orbitStyle]}>
                         <View style={styles.orbitDot} />
@@ -184,10 +179,10 @@ export default function OptimizationLoaderScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
   },
   header: {
     paddingTop: 10,
@@ -198,7 +193,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoText: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "900",
     letterSpacing: 2,
@@ -221,8 +216,8 @@ const styles = StyleSheet.create({
       width: 140,
       height: 140,
       borderRadius: 40,
-      backgroundColor: 'rgba(0, 188, 212, 0.1)',
-      shadowColor: '#00bcd4',
+      backgroundColor: isDark ? 'rgba(0, 188, 212, 0.1)' : 'rgba(0, 188, 212, 0.05)',
+      shadowColor: colors.primary,
       shadowRadius: 50,
       shadowOpacity: 0.5,
   },
@@ -231,16 +226,18 @@ const styles = StyleSheet.create({
       height: 154,
       borderRadius: 40,
       padding: 2,
-      backgroundColor: 'rgba(0, 188, 212, 0.5)',
+      backgroundColor: isDark ? 'rgba(0, 188, 212, 0.5)' : 'rgba(0, 188, 212, 0.2)',
       overflow: 'hidden',
   },
   widgetInner: {
       flex: 1,
-      backgroundColor: '#121212',
+      backgroundColor: colors.surface,
       borderRadius: 38,
       justifyContent: "center",
       alignItems: "center",
       overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
   },
   orbitContainer: {
     position: 'absolute',
@@ -260,7 +257,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
   },
   mainTitle: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 44,
     fontWeight: "900",
     textAlign: "center",
@@ -268,19 +265,25 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   subTitle: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 18,
     textAlign: "center",
     lineHeight: 28,
+    opacity: 0.6,
   },
   statusCard: {
     width: width - 40,
-    backgroundColor: "#0d0d0d",
+    backgroundColor: colors.surface,
     borderRadius: 30,
     padding: 30,
     marginTop: 80,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
   },
   cardHeader: {
     flexDirection: "row",
@@ -303,32 +306,32 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.8,
   },
   statusLabelText: {
-    color: "#ff9800",
+    color: '#ff9800',
     fontSize: 13,
     fontWeight: "900",
     letterSpacing: 1.5,
   },
   percentText: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 16,
     fontWeight: "900",
   },
   statusMessage: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "500",
     marginBottom: 25,
   },
   progressContainer: {
     height: 6,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
     borderRadius: 3,
     overflow: "hidden",
     marginBottom: 35,
   },
   progressIndicator: {
     height: "100%",
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
   },
   metricsRow: {
     flexDirection: "row",
@@ -338,17 +341,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metricLabel: {
-    color: "rgba(255,255,255,0.3)",
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: "800",
     marginBottom: 6,
     letterSpacing: 1,
+    opacity: 0.5,
   },
   metricValue: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 12,
     fontWeight: "600",
-    fontFamily: 'monospace',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   footer: {
       position: 'absolute',
@@ -358,27 +362,28 @@ const styles = StyleSheet.create({
   intelBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.03)',
+      backgroundColor: colors.surface,
       paddingHorizontal: 20,
       paddingVertical: 10,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.05)',
+      borderColor: colors.border,
   },
   intelDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
-      backgroundColor: '#00bcd4',
+      backgroundColor: colors.primary,
       marginRight: 10,
-      shadowColor: '#00bcd4',
+      shadowColor: colors.primary,
       shadowRadius: 10,
       shadowOpacity: 1,
   },
   intelText: {
-      color: 'rgba(255,255,255,0.5)',
+      color: colors.textSecondary,
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: "800",
       letterSpacing: 1.5,
+      opacity: 0.7,
   },
 });
