@@ -41,3 +41,15 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Report folder
+/report/
+
+# Document & Documentation files
+*.doc
+*.docx
+*.pdf
+*.ppt
+*.pptx
+*.xls
+*.xlsx
