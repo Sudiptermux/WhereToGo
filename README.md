@@ -1,18 +1,6 @@
 # WhereToGo: An AI-Driven Tour Planning and Trip Execution Platform
 
-[![Status](https://img.shields.io/badge/Status-Demo--Ready-brightgreen.svg)](https://github.com/Sudiptermux/WhereToGo)
-[![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20Web-blue.svg)](https://github.com/Sudiptermux/WhereToGo)
-[![Framework](https://img.shields.io/badge/Framework-React%20Native%20%7C%20Expo%2054-61DAFB.svg)](https://reactnative.dev/)
-[![Backend](https://img.shields.io/badge/Backend-Supabase%20%7C%20PostgreSQL-3ECF8E.svg)](https://supabase.com/)
-
-WhereToGo is an AI-driven travel intelligence platform developed as part of the **Project on Product Development–I (PPD-I)** course requirement. It transforms fragmented travel planning into a structured and immersive journey by integrating discovery, planning, optimization, and execution within a single application. Moving beyond conventional map-based tools, the system focuses on high-fidelity trip execution through a custom-built optimization engine. Built as a 6th Semester B.Tech Computer Science & Engineering project at the **Government College of Engineering Kalahandi (GCEK), Bhawanipatna**, Odisha.
-
-## 👥 Authors & Affiliation
-* **Students**: Sudipta Sugyan Sahu (2301110081), Subhransu Sekhar (2301110079), Sunita Sukla (2301110082), Hari Pangi (2301110033), Mohit Kabi (2301110046)
-* **Project Guide**: Prof. Kamakshya Prasad Nayak (*Asst. Prof., CSE*)
-* **Project-in-Charge**: Dr. Basanta Kumar Swain (*Asst. Prof., CSE*)
-* **Department Head**: Dr. Gopal Behera (*HoD, CSE*)
-* *Department of Computer Science and Engineering, Government College of Engineering Kalahandi, Bhawanipatna, Odisha 766002, India*
+WhereToGo is an AI-driven travel intelligence platform that transforms fragmented travel planning into a structured, immersive experience by integrating discovery, planning, route optimization, and live journey execution within a single application. Moving beyond conventional search-oriented map tools, WhereToGo functions as a **Digital Curator**, using advanced constraint-based route optimization algorithms to design and execute highly personalized, time-feasible multi-day travel itineraries.
 
 ---
 
@@ -57,7 +45,7 @@ Below is the sequential flow of the application demonstrating the complete plann
 
 | Phase | Screen / Feature | Description | Screen Preview |
 | :--- | :--- | :--- | :---: |
-| **01** | **Splash & Login** | Branded native splash and JWT-based session recovery using Supabase Auth. | <img src="assets/images/app-flow/01_login.jpeg" width="180" alt="Splash & Login"/> |
+| **01** | **Auth / Login** | Secure session authentication and JWT-based session recovery using Supabase Auth. | <img src="assets/images/app-flow/01_login.jpeg" width="180" alt="Auth / Login"/> |
 | **02** | **Home Dashboard** | Home explore interface featuring regional selection, search, nearest spots, and popular suggestions. | <img src="assets/images/app-flow/02_home_explore.jpeg" width="180" alt="Home Dashboard"/> |
 | **03** | **Discovery Reels** | Full-screen vertical auto-play video feed streaming curated destination clips from Supabase Storage CDN. | <img src="assets/images/app-flow/03_reels_discovery.jpeg" width="180" alt="Discovery Reels"/> |
 | **04** | **Place Details** | Parallax scroll detail screen presenting editorial descriptions, hours, ratings, and image gallery. | <img src="assets/images/app-flow/04_details_deep_dive.jpeg" width="180" alt="Place Details"/> |
@@ -144,7 +132,7 @@ To prevent Google Maps API key exposure on compiles, all geospatial requests pas
 ## 📊 Benchmarks & Validation Results
 
 ### Performance Benchmarking Results
-Audits conducted using React Native Debugger, Expo's built-in FPS monitor, and the Flashlight profiling tool across multiple Android test devices (Snapdragon 680, Snapdragon 720G, and Dimensity 700) demonstrate the following results (corresponds to **Table 6.1** in the project report):
+Audits conducted using React Native Debugger, Expo's built-in FPS monitor, and the Flashlight profiling tool across multiple Android test devices (Snapdragon 680, Snapdragon 720G, and Dimensity 700) demonstrate the following results:
 
 | Metric | Target / SLA | Achieved Value | Status |
 | :--- | :--- | :--- | :---: |
@@ -158,7 +146,7 @@ Audits conducted using React Native Debugger, Expo's built-in FPS monitor, and t
 | **Cold-Start Session Restore** (AsyncStorage) | < 0.5 seconds | ~0.2 seconds | ✓ Pass |
 
 ### User Acceptance Testing (UAT) Summary
-A comprehensive UAT phase was executed with 5 independent testers to validate correctness and user journeys (corresponds to **Table 6.2** in the project report):
+A comprehensive UAT phase was executed with 5 independent testers to validate correctness and user journeys:
 
 | Test Scenario | Success Criteria | Achieved Result | Status |
 | :--- | :--- | :--- | :---: |
@@ -171,10 +159,14 @@ A comprehensive UAT phase was executed with 5 independent testers to validate co
 | **Esri Map Tile Performance** | Tile rendering without Access Denied errors | Clean raster tiles loaded without latency | ✓ Pass |
 | **Journey Checklist & Progress Tracker** | Progress bar = (completed/total) * 100% | Verified for 3/6 and 6/6 stop scenarios | ✓ Pass |
 
-### Legacy Ecosystem Score-Based Comparison
-Instead of comparing against a single competitor, WhereToGo was evaluated against GIS tools (Google Maps), Social Curation (Instagram/TikTok), and Static Directories (TripAdvisor):
+### Legacy Ecosystem Comparison & Evaluation
+Instead of comparing against a single competitor, WhereToGo was evaluated against GIS tools (Google Maps), Social Curation (Instagram/TikTok), and Static Directories (TripAdvisor) across design philosophy, route optimization capabilities, temporal constraints validation, and content delivery layout:
 
-<img src="assets/images/wheretogo_comparison_diagram.png" width="600" alt="Legacy Ecosystem Comparison Diagram"/>
+<div align="center">
+  <img src="assets/images/wheretogo_legacy_ecosystem_types.png" width="700" alt="Legacy Ecosystem Types Diagram"/>
+  <br/><br/>
+  <img src="assets/images/wheretogo_comparison_diagram.png" width="550" alt="Legacy Ecosystem Comparison Diagram"/>
+</div>
 
 ---
 
@@ -193,7 +185,6 @@ WhereToGo/
 ├── components/           # Reusable UI widgets and custom MapViewShim (Web/Mobile)
 ├── constants/            # Global HSL Colors palette & place metadata structure
 ├── context/              # Context Providers (TripContext and ThemeContext)
-├── report/               # Original 6-phase technical system reports
 ├── scripts/              # Migration scripts (local SQLite to Supabase CDN)
 └── services/             # API services (SupabaseClient & PlaceService query engine)
 ```
