@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,19 +15,23 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { placeService } from "../../services/placeService";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function PlanScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [searchText, setSearchText] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        const data = await placeService.getRandomPlaces(5);
+        const data = await placeService.getPopular(5);
         setSuggestions(data);
       } catch (err) {
         console.error("Plan Suggestions Error:", err);
@@ -35,7 +39,6 @@ export default function PlanScreen() {
         setLoading(false);
       }
     };
-
     fetchSuggestions();
   }, []);
 
@@ -61,7 +64,7 @@ export default function PlanScreen() {
           style={styles.cardImage} 
         />
         <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.85)"]}
+          colors={["transparent", isDark ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.7)"]}
           style={styles.cardGradient}
         />
         <View style={styles.cardContent}>
@@ -74,7 +77,7 @@ export default function PlanScreen() {
             onPress={() => router.push({ pathname: "/discovery", params: { placeId: item.id } })}
           >
             <Text style={styles.exploreBtnText}>EXPLORE AREA</Text>
-            <Feather name="arrow-up-right" size={16} color="#081a2e" />
+            <Feather name="arrow-up-right" size={16} color={isDark ? "#081a2e" : "#fff"} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -93,11 +96,11 @@ export default function PlanScreen() {
         {/* Search Bar */}
         <View style={styles.searchSection}>
           <View style={styles.searchBox}>
-            <Ionicons name="compass" size={24} color="#8e9e9f" />
+            <Ionicons name="compass" size={24} color={colors.primary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search Area (e.g. Sambalpur)"
-              placeholderTextColor="#444"
+              placeholderTextColor={colors.textMuted}
               value={searchText}
               onChangeText={setSearchText}
               onSubmitEditing={handleSearch}
@@ -106,7 +109,7 @@ export default function PlanScreen() {
               style={styles.searchAction}
               onPress={handleSearch}
             >
-              <Ionicons name="search" size={20} color="#081a2e" />
+              <Ionicons name="search" size={20} color={isDark ? "#081a2e" : "#fff"} />
             </TouchableOpacity>
           </View>
         </View>
@@ -118,13 +121,13 @@ export default function PlanScreen() {
 
         {loading ? (
           <View style={{ height: 300, justifyContent: 'center' }}>
-            <ActivityIndicator color="#00bcd4" size="large" />
+            <ActivityIndicator color={colors.primary} size="large" />
           </View>
         ) : (
           <View style={styles.listContainer}>
             {suggestions.map(renderCard)}
             {suggestions.length === 0 && (
-              <Text style={{ color: '#444', textAlign: 'center', marginTop: 20 }}>No suggestions found.</Text>
+              <Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 20 }}>No suggestions found.</Text>
             )}
           </View>
         )}
@@ -135,10 +138,10 @@ export default function PlanScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
   },
   scrollContainer: {
     paddingBottom: 20,
@@ -151,18 +154,19 @@ const styles = StyleSheet.create({
   titleMain: {
     fontSize: 40,
     fontWeight: "900",
-    color: "#fff",
+    color: colors.text,
     letterSpacing: 1.5,
   },
   titleAccent: {
-    color: "#00bcd4",
+    color: colors.primary,
   },
   subtitle: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 2,
     marginTop: 8,
+    opacity: 0.8,
   },
   searchSection: {
     paddingHorizontal: 25,
@@ -171,23 +175,28 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     height: 70,
     paddingLeft: 20,
     paddingRight: 8,
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "600",
     marginLeft: 12,
   },
   searchAction: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     width: 55,
     height: 55,
     borderRadius: 15,
@@ -201,8 +210,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#444",
+    color: colors.textSecondary,
     letterSpacing: 1.5,
+    opacity: 0.6,
   },
   listContainer: {
     paddingHorizontal: 25,
@@ -213,7 +223,12 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     overflow: "hidden",
     marginBottom: 25,
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5,
   },
   cardImage: {
     width: "100%",
@@ -233,7 +248,7 @@ const styles = StyleSheet.create({
     right: 35,
   },
   cardCategory: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.2,
@@ -247,13 +262,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardArea: {
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(255,255,255,0.7)",
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 20,
   },
   exploreBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.isDark ? "#fff" : colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 18,
@@ -262,7 +277,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   exploreBtnText: {
-    color: "#081a2e",
+    color: colors.isDark ? "#081a2e" : "#fff",
     fontWeight: "900",
     fontSize: 14,
     marginRight: 8,

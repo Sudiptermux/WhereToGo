@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Image,
   ScrollView,
@@ -13,12 +13,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip } from "../../context/TripContext";
 import { useRouter } from "expo-router";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function SavedScreen() {
   const { savedTrips, loadSavedTrip, likedPlaces, toggleLike, deleteTrip } = useTrip();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
+
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const getSource = (src: any) => typeof src === 'number' ? src : { uri: src };
 
@@ -31,20 +35,39 @@ export default function SavedScreen() {
     deleteTrip(id);
   };
 
+  const getBestTripImage = (trip: any) => {
+    // 1. Try the explicit trip image first
+    if (trip.image && typeof trip.image === 'string' && !trip.image.includes('coming-soon')) {
+        return { uri: trip.image };
+    }
+
+    // 2. Scan trip_data (places) for the first valid image
+    const places = Array.isArray(trip.trip_data) ? trip.trip_data : (trip.trip_data?.places || []);
+    for (const p of places) {
+        const pImg = p.image_url || p.image;
+        if (pImg && typeof pImg === 'string' && !pImg.includes('coming-soon')) {
+            return { uri: pImg };
+        }
+    }
+
+    // 3. Last fallback
+    return require("../../assets/images/coming-soon.png");
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn}>
-          <Feather name="menu" size={24} color="#00bcd4" />
+          <Feather name="menu" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Saved Trips</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Feather name="search" size={22} color="#fff" />
+            <Feather name="search" size={22} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="notifications-outline" size={24} color="#fff" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -97,7 +120,7 @@ export default function SavedScreen() {
           {savedTrips.length > 0 ? (
             savedTrips.map((trip) => (
               <TouchableOpacity key={trip.id} style={styles.tripCard} onPress={() => handleLoadTrip(trip)}>
-                <Image source={getSource(trip.image)} style={styles.tripImage} />
+                <Image source={getBestTripImage(trip)} style={styles.tripImage} />
                 <LinearGradient
                   colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.8)"]}
                   style={styles.cardGradient}
@@ -118,7 +141,7 @@ export default function SavedScreen() {
                 <View style={styles.cardFooter}>
                   <Text style={styles.tripTitle}>{trip.title}</Text>
                   <View style={styles.dateRow}>
-                    <Feather name="calendar" size={14} color="#8e9e9f" />
+                    <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
                     <Text style={styles.dateText}>{trip.dates}</Text>
                   </View>
                 </View>
@@ -126,7 +149,7 @@ export default function SavedScreen() {
             ))
           ) : (
             <View style={styles.emptyState}>
-                <Ionicons name="map-outline" size={60} color="rgba(255,255,255,0.1)" />
+                <Ionicons name="map-outline" size={60} color={isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"} />
                 <Text style={styles.emptyText}>No journeys saved yet</Text>
             </View>
           )}
@@ -136,7 +159,7 @@ export default function SavedScreen() {
         <View style={styles.ctaContainer}>
             <View style={styles.ctaBoundary}>
                 <View style={styles.plusIconBox}>
-                    <Ionicons name="add" size={30} color="#fff" />
+                    <Ionicons name="add" size={30} color={isDark ? "#fff" : colors.primary} />
                 </View>
                 <Text style={styles.ctaTitle}>Plan a new escape</Text>
                 <Text style={styles.ctaSubtitle}>
@@ -147,7 +170,7 @@ export default function SavedScreen() {
                     onPress={() => router.replace("/planner")}
                 >
                     <LinearGradient
-                        colors={["#00F2FE", "#4FACFE"]}
+                        colors={isDark ? ["#00F2FE", "#4FACFE"] : [colors.primary, "#81ecec"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.gradientBtn}
@@ -164,8 +187,8 @@ export default function SavedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#060606" },
+const createStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -177,7 +200,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#fff",
+    color: colors.text,
     flex: 1,
     marginLeft: 15,
   },
@@ -197,14 +220,14 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   eyebrow: {
-    color: "#c27d14",
+    color: colors.accent,
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 1.5,
     marginBottom: 8,
   },
   mainTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 34,
@@ -220,15 +243,16 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   sectionEyebrow: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.5,
   },
   sectionCount: {
-    color: "rgba(255,255,255,0.4)",
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: "700",
+    opacity: 0.6,
   },
   wishlistScroll: {
     paddingLeft: 20,
@@ -239,10 +263,15 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 20,
     marginRight: 15,
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   wishlistImage: {
     width: "100%",
@@ -285,7 +314,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     marginBottom: 20,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
   },
   tripImage: {
     width: "100%",
@@ -322,11 +356,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.2)",
   },
   cardFooter: {
     position: "absolute",
@@ -344,10 +378,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dateText: {
-    color: "#8e9e9f",
+    color: "rgba(255,255,255,0.8)",
     fontSize: 14,
     marginLeft: 6,
     fontWeight: "500",
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: colors.textSecondary,
+    marginTop: 15,
+    fontSize: 16,
+    opacity: 0.6,
   },
   ctaContainer: {
     paddingHorizontal: 20,
@@ -355,37 +400,38 @@ const styles = StyleSheet.create({
   },
   ctaBoundary: {
     borderWidth: 1.5,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
     borderStyle: "dashed",
     borderRadius: 30,
     padding: 30,
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.01)",
+    backgroundColor: colors.surface,
   },
   plusIconBox: {
     width: 50,
     height: 50,
     borderRadius: 16,
-    backgroundColor: "#121212",
+    backgroundColor: colors.isDark ? "#121212" : "rgba(0, 188, 212, 0.05)",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
   },
   ctaTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 8,
   },
   ctaSubtitle: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 24,
     paddingHorizontal: 20,
+    opacity: 0.8,
   },
   planningBtn: {
     borderRadius: 16,
@@ -397,7 +443,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   planningBtnText: {
-    color: "#081a2e",
+    color: colors.isDark ? "#081a2e" : "#fff",
     fontWeight: "800",
     fontSize: 16,
   },

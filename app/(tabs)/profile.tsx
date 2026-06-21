@@ -1,8 +1,8 @@
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
     Image,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,23 +11,37 @@ import {
     TextInput,
     Alert,
     Dimensions,
+    ActivityIndicator,
 } from "react-native";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip } from "../../context/TripContext";
+import { useTheme } from "../../context/ThemeContext";
 import * as ImagePicker from 'expo-image-picker';
+import { signOut, uploadAvatar } from "../../services/authService";
 
 const { width } = Dimensions.get("window");
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { userProfile, updateProfile, savedTrips, visitedPlaces, likedPlaces } = useTrip();
+  const { 
+    userProfile, 
+    updateProfile, 
+    savedTrips, 
+    lifetimeVisitedPlaces, 
+    likedPlaces 
+  } = useTrip();
+  const { theme, colors, isDark, toggleTheme } = useTheme();
+  
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(userProfile.name);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const stats = {
     trips: savedTrips.length,
-    stops: visitedPlaces.length,
+    stops: lifetimeVisitedPlaces.length,
     wishlist: likedPlaces.length,
     distance: savedTrips.reduce((acc, t) => acc + (t.days.reduce((dAcc, d) => dAcc + (d.totalDistanceKm || 0), 0)), 0).toFixed(0)
   };
@@ -49,12 +63,27 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled) {
-      updateProfile({ avatar: result.assets[0].uri });
+      setIsUploading(true);
+      try {
+        const publicUrl = await uploadAvatar(result.assets[0].uri);
+        updateProfile({ avatar: publicUrl });
+      } catch (error) {
+        console.error("Upload failed, falling back to local URI", error);
+        updateProfile({ avatar: result.assets[0].uri });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const onLogout = () => {
-    router.replace("/");
+  const onLogout = async () => {
+    try {
+      await signOut();
+      router.replace("/");
+    } catch (error) {
+      console.error("Logout failed", error);
+      router.replace("/");
+    }
   };
 
   return (
@@ -63,7 +92,7 @@ export default function ProfileScreen() {
         {/* Cinematic Header Card */}
         <View style={styles.heroSection}>
             <LinearGradient
-                colors={["#00bcd4", "#4facfe"]}
+                colors={colors.primaryGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.heroGradient}
@@ -71,11 +100,11 @@ export default function ProfileScreen() {
             <SafeAreaView style={styles.safeHeader}>
                 <View style={styles.headerTop}>
                     <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
-                        <Feather name="chevron-left" size={24} color="#fff" />
+                        <Feather name="chevron-left" size={24} color={isDark ? "#fff" : colors.text} />
                     </TouchableOpacity>
                     <Text style={styles.headerLabel}>DIGITAL IDENTITY</Text>
                     <TouchableOpacity style={styles.headerBtn}>
-                        <Ionicons name="settings-outline" size={22} color="#fff" />
+                        <Ionicons name="settings-outline" size={22} color={isDark ? "#fff" : colors.text} />
                     </TouchableOpacity>
                 </View>
 
@@ -86,11 +115,15 @@ export default function ProfileScreen() {
                                 <Image source={{ uri: userProfile.avatar }} style={styles.avatarImg} />
                             ) : (
                                 <View style={[styles.avatarImg, styles.avatarPlaceholder]}>
-                                    <Ionicons name="person" size={40} color="rgba(255,255,255,0.3)" />
+                                    <Ionicons name="person" size={40} color={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)"} />
                                 </View>
                             )}
                             <View style={styles.editPicBtn}>
-                                <Ionicons name="camera" size={14} color="#fff" />
+                                {isUploading ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Ionicons name="camera" size={14} color="#fff" />
+                                )}
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -104,7 +137,7 @@ export default function ProfileScreen() {
                                         value={newName}
                                         onChangeText={setNewName}
                                         autoFocus
-                                        placeholderTextColor="rgba(255,255,255,0.3)"
+                                        placeholderTextColor={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)"}
                                     />
                                     <TouchableOpacity 
                                         style={styles.saveBtn} 
@@ -115,14 +148,14 @@ export default function ProfileScreen() {
                                             }
                                         }}
                                     >
-                                        <Ionicons name="checkmark-circle" size={24} color="#00bcd4" />
+                                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                                     </TouchableOpacity>
                                 </View>
                             ) : (
                                 <>
                                     <Text style={styles.userName}>{userProfile.name}</Text>
                                     <TouchableOpacity style={styles.miniEditBtn} onPress={() => setIsEditing(true)}>
-                                        <Feather name="edit-3" size={16} color="rgba(255,255,255,0.6)" />
+                                        <Feather name="edit-3" size={16} color={isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.4)"} />
                                     </TouchableOpacity>
                                 </>
                             )}
@@ -152,13 +185,16 @@ export default function ProfileScreen() {
                 </View>
             </View>
 
-            <LinearGradient colors={["#121212", "#080808"]} style={styles.mileageCard}>
+            <LinearGradient 
+                colors={isDark ? ["#121212", "#080808"] : ["#ffffff", "#f8f9fa"]} 
+                style={styles.mileageCard}
+            >
                 <View style={styles.mileageInfo}>
                     <Text style={styles.mileageLabel}>TOTAL AIRTIME</Text>
                     <Text style={styles.mileageValue}>{stats.distance} <Text style={styles.kmUnit}>KM</Text></Text>
                 </View>
                 <View style={styles.mileageIcon}>
-                    <MaterialCommunityIcons name="map-marker-distance" size={32} color="#00bcd4" />
+                    <MaterialCommunityIcons name="map-marker-distance" size={32} color={colors.primary} />
                 </View>
             </LinearGradient>
         </View>
@@ -168,19 +204,19 @@ export default function ProfileScreen() {
             <Text style={styles.sectionHeader}>CURATOR MILESTONES</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesScroll}>
                 <View style={styles.badgeCard}>
-                    <View style={[styles.badgeIcon, { backgroundColor: 'rgba(0,188,212,0.1)' }]}>
+                    <View style={[styles.badgeIcon, { backgroundColor: isDark ? 'rgba(0,188,212,0.1)' : 'rgba(0,188,212,0.05)' }]}>
                         <Ionicons name="flash" size={24} color="#00bcd4" />
                     </View>
                     <Text style={styles.badgeName}>First Spark</Text>
                 </View>
                 <View style={styles.badgeCard}>
-                    <View style={[styles.badgeIcon, { backgroundColor: 'rgba(255,152,0,0.1)' }]}>
+                    <View style={[styles.badgeIcon, { backgroundColor: isDark ? 'rgba(255,152,0,0.1)' : 'rgba(255,152,0,0.05)' }]}>
                         <Ionicons name="shield-checkmark" size={24} color="#ff9800" />
                     </View>
                     <Text style={styles.badgeName}>City Legend</Text>
                 </View>
                 <View style={styles.badgeCard}>
-                    <View style={[styles.badgeIcon, { backgroundColor: 'rgba(156,39,176,0.1)' }]}>
+                    <View style={[styles.badgeIcon, { backgroundColor: isDark ? 'rgba(156,39,176,0.1)' : 'rgba(156,39,176,0.05)' }]}>
                         <Ionicons name="heart" size={24} color="#9c27b0" />
                     </View>
                     <Text style={styles.badgeName}>Heart Seeker</Text>
@@ -191,20 +227,34 @@ export default function ProfileScreen() {
         {/* Account Options */}
         <View style={styles.section}>
             <Text style={styles.sectionHeader}>PREFERENCES</Text>
-            <TouchableOpacity style={styles.actionRow}>
+            
+            {/* Theme Toggle */}
+            <TouchableOpacity style={styles.actionRow} onPress={toggleTheme}>
                 <View style={styles.actionLeft}>
                     <View style={styles.actionIconBox}>
-                        <Feather name="bell" size={18} color="#8e9e9f" />
+                        <Feather name={isDark ? "moon" : "sun"} size={18} color={isDark ? "#00bcd4" : "#FF9800"} />
                     </View>
-                    <Text style={styles.actionText}>Notifications</Text>
+                    <Text style={styles.actionText}>Appearance</Text>
                 </View>
-                <Feather name="chevron-right" size={18} color="#333" />
+                <View style={styles.themeBadge}>
+                    <Text style={styles.themeBadgeText}>{theme.toUpperCase()}</Text>
+                </View>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionRow}>
                 <View style={styles.actionLeft}>
                     <View style={styles.actionIconBox}>
-                        <Feather name="globe" size={18} color="#8e9e9f" />
+                        <Feather name="bell" size={18} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.actionText}>Notifications</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionRow}>
+                <View style={styles.actionLeft}>
+                    <View style={styles.actionIconBox}>
+                        <Feather name="globe" size={18} color={colors.textSecondary} />
                     </View>
                     <Text style={styles.actionText}>Language</Text>
                 </View>
@@ -227,17 +277,17 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#060606" },
+const createStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   content: { flexGrow: 1 },
   heroSection: {
     height: 380,
     position: 'relative',
-    backgroundColor: '#000',
+    backgroundColor: colors.isDark ? '#000' : colors.surface,
   },
   heroGradient: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.15,
+    opacity: colors.isDark ? 0.15 : 0.08,
   },
   safeHeader: {
     flex: 1,
@@ -254,12 +304,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerLabel: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 2,
@@ -276,7 +326,7 @@ const styles = StyleSheet.create({
     height: 130,
     borderRadius: 65,
     padding: 5,
-    backgroundColor: 'rgba(0,188,212,0.2)',
+    backgroundColor: colors.isDark ? 'rgba(0,188,212,0.2)' : 'rgba(0,188,212,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -284,7 +334,7 @@ const styles = StyleSheet.create({
     width: 115,
     height: 115,
     borderRadius: 57.5,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.isDark ? '#1a1a1a' : '#f0f0f0',
   },
   avatarPlaceholder: {
     justifyContent: 'center',
@@ -297,9 +347,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#00bcd4',
+    backgroundColor: colors.primary,
     borderWidth: 3,
-    borderColor: '#060606',
+    borderColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -314,7 +364,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#fff',
+    color: colors.text,
     marginRight: 10,
   },
   miniEditBtn: {
@@ -323,16 +373,16 @@ const styles = StyleSheet.create({
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
     borderRadius: 15,
     paddingHorizontal: 15,
     borderWidth: 1,
-    borderColor: 'rgba(0,188,212,0.3)',
+    borderColor: colors.isDark ? 'rgba(0,188,212,0.3)' : 'rgba(0,188,212,0.1)',
   },
   userNameInput: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#fff',
+    color: colors.text,
     minWidth: 150,
     paddingVertical: 8,
   },
@@ -340,15 +390,15 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   personaBadge: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
     paddingHorizontal: 15,
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
   },
   personaText: {
-    color: '#00bcd4',
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.5,
@@ -359,12 +409,17 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
-    backgroundColor: '#161616',
+    backgroundColor: colors.surface,
     borderRadius: 25,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.border,
     marginBottom: 15,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
   },
   statItem: {
     flex: 1,
@@ -373,15 +428,15 @@ const styles = StyleSheet.create({
   statBorder: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.border,
   },
   statNum: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 20,
     fontWeight: '900',
   },
   statDesc: {
-    color: 'rgba(255,255,255,0.4)',
+    color: colors.textSecondary,
     fontSize: 9,
     fontWeight: '800',
     marginTop: 4,
@@ -394,31 +449,37 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: 'rgba(0,188,212,0.15)',
+    borderColor: colors.isDark ? 'rgba(0,188,212,0.15)' : 'rgba(0,188,212,0.1)',
+  },
+  mileageInfo: {
+    flex: 1,
   },
   mileageLabel: {
-    color: 'rgba(255,255,255,0.4)',
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 5,
   },
   mileageValue: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 26,
     fontWeight: '900',
   },
   kmUnit: {
     fontSize: 14,
-    color: '#00bcd4',
+    color: colors.primary,
     opacity: 0.8,
+  },
+  mileageIcon: {
+    marginLeft: 20,
   },
   section: {
     marginTop: 40,
     paddingHorizontal: 25,
   },
   sectionHeader: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 2,
@@ -441,10 +502,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.border,
   },
   badgeName: {
-    color: '#8e9e9f',
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
@@ -453,12 +514,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: colors.surface,
     padding: 18,
     borderRadius: 20,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
+    borderColor: colors.border,
   },
   actionLeft: {
     flexDirection: 'row',
@@ -468,20 +529,31 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.isDark ? '#1a1a1a' : '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
   },
   actionText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
   actionValue: {
-    color: '#8e9e9f',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
+  },
+  themeBadge: {
+    backgroundColor: colors.isDark ? 'rgba(0,188,212,0.1)' : 'rgba(255,152,0,0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  themeBadgeText: {
+    color: colors.isDark ? '#00bcd4' : '#FF9800',
+    fontSize: 10,
+    fontWeight: '800',
   },
   logoutAction: {
     marginTop: 10,

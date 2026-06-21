@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Image,
   ScrollView,
@@ -10,62 +10,83 @@ import {
   FlatList,
   Dimensions,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
+import * as Location from 'expo-location';
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Location from "expo-location";
 import { placeService } from "../../services/placeService";
 import { useTrip } from "../../context/TripContext";
+import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function HomeScreen() {
   const router = useRouter();
   const { userProfile } = useTrip();
+  const { colors, isDark } = useTheme();
+  
   const [searchText, setSearchText] = useState("");
-  const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
-  const [trendingPlaces, setTrendingPlaces] = useState<any[]>([]);
-  const [loadingNearby, setLoadingNearby] = useState(true);
-  const [loadingTrending, setLoadingTrending] = useState(true);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [nearestPlaces, setNearestPlaces] = useState<any[]>([]);
+  const [handpickedPlaces, setHandpickedPlaces] = useState<any[]>([]);
+  const [popularPlaces, setPopularPlaces] = useState<any[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const fetchSections = async () => {
+    try {
+      if (refreshing) {
+        placeService.clearPopularCache();
+      }
+
+      // Get User Location
+      let userLat = 21.4669; // Default Sambalpur
+      let userLng = 83.9812;
+      
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({});
+        userLat = location.coords.latitude;
+        userLng = location.coords.longitude;
+      }
+
+      // Fetching all sections in parallel for performance
+      const [np, hp, pp] = await Promise.all([
+        placeService.getNearestPlaces(userLat, userLng, 5),
+        placeService.getHandpicked(6),
+        placeService.getPopular(8)
+      ]);
+      
+      setNearestPlaces(np);
+      setHandpickedPlaces(hp);
+      setPopularPlaces(pp);
+    } catch (err) {
+      console.error("Home Data Fetch Error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    // 1. Fetch Trending Places (Random)
-    const fetchTrending = async () => {
-      try {
-        const data = await placeService.getRandomPlaces(4);
-        setTrendingPlaces(data);
-      } catch (err) {
-        console.error("Home Trending Error:", err);
-      } finally {
-        setLoadingTrending(false);
-        setLoadingNearby(false); // Disable nearby loader in safe mode
-      }
-    };
+    fetchSections();
+  }, []);
 
-    fetchTrending();
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchSections();
   }, []);
 
   const handleSearch = () => {
     if (searchText.trim()) {
+      // Search logic handles vibrations/vibes in placeService
       router.push({ pathname: "/discovery", params: { area: searchText } });
     }
-  };
-
-  const calculateDistanceStr = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    // Basic Haversine for display
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const d = R * c;
-    return d < 1 ? `${(d * 1000).toFixed(0)} m away` : `${d.toFixed(1)} km away`;
   };
 
   const renderExploreItem = ({ item }: { item: any }) => {
@@ -74,29 +95,51 @@ export default function HomeScreen() {
     return (
       <TouchableOpacity 
         style={styles.exploreCard}
-        onPress={() => router.push({ pathname: "/discovery", params: { placeId: item.id } })}
+        onPress={() => router.push({ pathname: "/details", params: { id: item.slug } })}
       >
         <Image source={getImgSource(item.image)} style={styles.exploreImage} />
         <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.8)"]}
+          colors={["transparent", isDark ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.65)"]}
           style={styles.exploreGradient}
         />
         
-        {item.isMissingMedia && (
-          <View style={styles.comingSoonBadgeHome}>
-             <Text style={styles.comingSoonTextHome}>COMING SOON</Text>
+        {item.distance && (
+          <View style={styles.distanceBadge}>
+            <Ionicons name="navigate" size={10} color="#fff" />
+            <Text style={styles.distanceText}>{item.distance.toFixed(1)} km away</Text>
           </View>
         )}
 
         <View style={styles.exploreContent}>
           <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{item.category?.toUpperCase()}</Text>
+            <Text style={styles.categoryText}>{item.category?.toUpperCase() || "DISCOVER"}</Text>
           </View>
           <Text style={styles.exploreTitle}>{item.title}</Text>
           <View style={styles.locationRow}>
-            <Ionicons name="location-sharp" size={14} color="#00bcd4" />
+            <Ionicons name="location-sharp" size={14} color={colors.primary} />
             <Text style={styles.exploreDistance}>{item.location_display}</Text>
           </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderHorizontalItem = (item: any) => {
+    const getImgSource = (src: any) => typeof src === 'number' ? src : { uri: src };
+
+    return (
+      <TouchableOpacity 
+        key={item.id}
+        style={styles.popularCard}
+        onPress={() => router.push({ pathname: "/details", params: { id: item.slug } })}
+      >
+        <Image source={getImgSource(item.image)} style={styles.popularImage} />
+        <View style={styles.popularInfo}>
+            <Text style={styles.popularTitle} numberOfLines={1}>{item.title}</Text>
+            <View style={styles.popularMeta}>
+                <Ionicons name="star" size={10} color="#fbc02d" />
+                <Text style={styles.popularRating}>{item.rating || '4.8'}</Text>
+            </View>
         </View>
       </TouchableOpacity>
     );
@@ -113,11 +156,6 @@ export default function HomeScreen() {
       >
         <View style={styles.trendingImageWrapper}>
             <Image source={getImgSource(item.image)} style={styles.trendingImage} />
-            {item.isMissingMedia && (
-                <View style={styles.trendingComingSoonPatch}>
-                    <Text style={styles.comingSoonTextSmall}>NEW</Text>
-                </View>
-            )}
         </View>
         <View style={styles.trendingInfo}>
           <View>
@@ -126,7 +164,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.ratingBadge}>
             <Ionicons name="star" size={12} color="#fbc02d" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
+            <Text style={styles.ratingText}>{item.rating || '4.8'}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -135,19 +173,32 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+            <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+            />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.brandTitle}>WhereToGo</Text>
-            <Text style={styles.welcomeText}>Hi, {userProfile.name.split(' ')[0]}</Text>
+            <View style={styles.brandContainer}>
+                <Text style={styles.brandTitleWhere}>Where</Text>
+                <Text style={styles.brandTitleToGo}>ToGo</Text>
+            </View>
+            <Text style={styles.welcomeText}>Hi, {userProfile?.name?.split(' ')[0] || "Explorer"}</Text>
           </View>
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
-            {userProfile.avatar ? (
+            {userProfile?.avatar ? (
                 <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
             ) : (
                 <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={20} color="rgba(255,255,255,0.3)" />
+                    <Ionicons name="person" size={20} color={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)"} />
                 </View>
             )}
           </TouchableOpacity>
@@ -157,12 +208,12 @@ export default function HomeScreen() {
         <View style={styles.searchContainer}>
           <View style={styles.searchBox}>
             <TouchableOpacity onPress={handleSearch}>
-              <Feather name="search" size={20} color="#8e9e9f" />
+              <Feather name="search" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search Area (e.g. Sambalpur)"
-              placeholderTextColor="#8e9e9f"
+              placeholder="Vibe, Category, or Area..."
+              placeholderTextColor={colors.textMuted}
               value={searchText}
               onChangeText={setSearchText}
               onSubmitEditing={handleSearch}
@@ -170,19 +221,17 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Explore Nearby with Recommendation Fallback */}
+        {/* Nearest Destinations (Top - Big Cards) */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {nearbyPlaces.length === 0 ? "Handpicked for You" : "Explore Nearby"}
-          </Text>
+          <Text style={styles.sectionTitle}>Nearest Destinations</Text>
         </View>
-        {loadingNearby ? (
+        {loading ? (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator color="#00bcd4" />
+            <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
           <FlatList
-            data={nearbyPlaces.length > 0 ? nearbyPlaces : trendingPlaces}
+            data={nearestPlaces}
             renderItem={renderExploreItem}
             keyExtractor={(item) => item.id}
             horizontal
@@ -193,52 +242,93 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* Journey Card (CTA) */}
-        <TouchableOpacity 
-          style={styles.journeyWrapper}
-          onPress={() => router.push("/(tabs)/plan")}
-        >
-          <LinearGradient
-            colors={["#00F2FE", "#4FACFE"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.journeyCard}
-          >
-            <View style={styles.journeyContent}>
-              <Text style={styles.journeyTitle}>Craft Your{"\n"}Next Journey</Text>
-              <Text style={styles.journeySubtitle}>
-                AI-curated itineraries tailored for you.
-              </Text>
-              
-              <View style={styles.startPlanningBtn}>
-                <Text style={styles.startPlanningText}>Start Planning</Text>
-                <Feather name="arrow-right" size={18} color="#fff" />
-              </View>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Trending Now */}
+        {/* Popular Suggestions (Horizontal Mini) */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Trending Now</Text>
+          <Text style={styles.sectionTitle}>Popular Suggestions</Text>
+        </View>
+        <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.popularList}
+        >
+            {popularPlaces.map(renderHorizontalItem)}
+        </ScrollView>
+
+        {/* Handpicked for You (Bottom - List Cards) */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Handpicked for You</Text>
         </View>
         <View style={styles.listContainer}>
-          {loadingTrending ? (
-            <ActivityIndicator color="#00bcd4" />
+          {loading ? (
+            <ActivityIndicator color={colors.primary} />
           ) : (
-            trendingPlaces.map(renderTrendingItem)
+            handpickedPlaces.map(renderTrendingItem)
           )}
         </View>
 
-        {/* Bottom Padding */}
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#060606" },
+const createStyles = (colors: any) => StyleSheet.create({
+  distanceBadge: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  distanceText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  popularList: {
+    paddingLeft: 20,
+    paddingRight: 10,
+    marginBottom: 35,
+  },
+  popularCard: {
+    width: 140,
+    marginRight: 12,
+  },
+  popularImage: {
+    width: 140,
+    height: 100,
+    borderRadius: 20,
+    marginBottom: 8,
+    backgroundColor: colors.surface,
+  },
+  popularInfo: {
+    paddingHorizontal: 4,
+  },
+  popularTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  popularMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  popularRating: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "600",
+    marginLeft: 4,
+    opacity: 0.8,
+  },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -247,14 +337,24 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     marginBottom: 20,
   },
-  brandTitle: {
+  brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandTitleWhere: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#fff",
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  brandTitleToGo: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.primary,
     letterSpacing: -0.5,
   },
   welcomeText: {
-    color: "#00bcd4",
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: "600",
     marginTop: -2,
@@ -264,31 +364,37 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   avatarPlaceholder: {
     justifyContent: "center",
     alignItems: "center",
   },
-
   searchContainer: {
     paddingHorizontal: 20,
     marginBottom: 30,
   },
   searchBox: {
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 25,
     paddingHorizontal: 18,
     height: 54,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
     marginLeft: 12,
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
   },
   sectionHeader: {
@@ -298,17 +404,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#fff",
+    color: colors.text,
   },
   loaderContainer: {
     height: 100,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyText: {
-    color: '#444',
-    paddingLeft: 20,
-    fontStyle: 'italic',
   },
   exploreList: {
     paddingLeft: 20,
@@ -321,7 +422,12 @@ const styles = StyleSheet.create({
     marginRight: 15,
     borderRadius: 30,
     overflow: "hidden",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+    elevation: 8,
   },
   exploreImage: {
     width: "100%",
@@ -332,7 +438,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: "100%",
+    height: "70%",
   },
   exploreContent: {
     position: "absolute",
@@ -342,17 +448,17 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   categoryBadge: {
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.4)",
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.15)",
   },
   categoryText: {
-    color: "#8e9e9f",
+    color: "#fff",
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 1,
@@ -368,7 +474,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   exploreDistance: {
-    color: "#8e9e9f",
+    color: "rgba(255,255,255,0.7)",
     fontSize: 12,
     marginLeft: 4,
   },
@@ -381,6 +487,11 @@ const styles = StyleSheet.create({
     padding: 30,
     minHeight: 220,
     justifyContent: "center",
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.25,
+    shadowRadius: 25,
+    elevation: 10,
   },
   journeyContent: {
     flex: 1,
@@ -424,13 +535,18 @@ const styles = StyleSheet.create({
   },
   trendingCard: {
     flexDirection: "row",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 12,
     marginBottom: 14,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   trendingImage: {
     width: 70,
@@ -445,25 +561,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   trendingTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 4,
   },
   trendingCountry: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 13,
   },
   ratingBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: colors.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
   },
   ratingText: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 13,
     fontWeight: "700",
     marginLeft: 4,
@@ -499,7 +615,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#121212",
+    borderColor: colors.surface,
   },
   comingSoonTextSmall: {
     color: "#000",
