@@ -20,8 +20,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { placeService } from "../../services/placeService";
 import { useTrip } from "../../context/TripContext";
 import { useTheme } from "../../context/ThemeContext";
+import { Platform } from "react-native";
 
-const { width } = Dimensions.get("window");
+const { width: windowWidth } = Dimensions.get("window");
+const width = Platform.OS === 'web' ? 500 : windowWidth;
 
 export default function HomeScreen() {
   const router = useRouter();

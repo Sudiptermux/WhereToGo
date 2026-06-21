@@ -18,8 +18,10 @@ import { placeService } from "../services/placeService";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../context/ThemeContext";
+import { Platform } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { width: windowWidth, height } = Dimensions.get("window");
+const width = Platform.OS === 'web' ? 500 : windowWidth;
 
 // HIGH-PERFORMANCE REEL v1.3 - THEME_READY
 const ReelItem = memo(({ 

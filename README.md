@@ -78,8 +78,8 @@ The third term $t(i,j, H+t(D,i,H))$ accounts for the elapsed travel duration to 
 A route merge is accepted only when all six constraint dimensions are simultaneously satisfied:
 
 *   **Depot Anchoring**: All daily routes must start and end at the stay location ($D$), geocoded via Google Geocoding API.
-*   **Opening Time Window**: Arrival time at stop $i$ must satisfy: $t_{\text{arrival}}(i) \ge \text{opening\_time}_i$ (queried dynamically via Google Places API).
-*   **Closing Time Window**: Visit completion time must satisfy: $t_{\text{arrival}}(i) + s_i \le \text{closing\_time}_i$ (where $s_i$ is the average visit duration).
+*   **Opening Time Window**: Arrival time at stop $i$ must satisfy: $t_{\text{arrival}}(i) \ge t_{\text{open}}(i)$ (queried dynamically via Google Places API).
+*   **Closing Time Window**: Visit completion time must satisfy: $t_{\text{arrival}}(i) + s_i \le t_{\text{close}}(i)$ (where $s_i$ is the average visit duration).
 *   **Traffic-Adjusted Buffer**: Arrival at the next stop is computed as: $t_{\text{arrival}}(i+1) = t_{\text{arrival}}(i) + s_i + t_{\text{traffic}}(i, i+1)$.
 *   **Day Capacity**: Cumulative daily travel and visit times cannot exceed **540 minutes** (9 hours).
 *   **Fixed Departure**: Route chains are computed forward from a hard 09:00 AM depot departure.
