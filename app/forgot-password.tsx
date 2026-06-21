@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -11,9 +11,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { forgotPassword, confirmPassword as authConfirmPassword } from "../services/authService";
+import { useTheme } from "../context/ThemeContext";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -22,6 +25,8 @@ export default function ForgotPasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const sendReset = async () => {
     if (!email.trim()) {
@@ -67,7 +72,7 @@ export default function ForgotPasswordScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconCircle}>
-          <Feather name="lock" size={32} color="#081a2e" />
+          <Feather name="lock" size={32} color={isDark ? "#081a2e" : "#fff"} />
         </View>
 
         <Text style={styles.heading}>Forgot Password</Text>
@@ -79,13 +84,13 @@ export default function ForgotPasswordScreen() {
             </Text>
             
             <View style={styles.inputContainer}>
-              <Feather name="mail" size={18} color="#8e9e9f" />
+              <Feather name="mail" size={18} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email address"
-                placeholderTextColor="#444"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -106,44 +111,44 @@ export default function ForgotPasswordScreen() {
             </Text>
             
             <View style={styles.inputContainer}>
-              <Ionicons name="keypad" size={18} color="#8e9e9f" />
+              <Ionicons name="keypad" size={18} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={code}
                 onChangeText={setCode}
                 placeholder="Verification code"
-                placeholderTextColor="#444"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="number-pad"
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <Feather name="lock" size={18} color="#8e9e9f" />
+              <Feather name="lock" size={18} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="New password"
-                placeholderTextColor="#444"
+                placeholderTextColor={colors.textSecondary}
                 secureTextEntry={!passwordVisible}
               />
               <TouchableOpacity onPress={() => setPasswordVisible((v) => !v)}>
                 <Feather
                   name={passwordVisible ? "eye-off" : "eye"}
                   size={18}
-                  color="#8e9e9f"
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
-              <Feather name="lock" size={18} color="#8e9e9f" />
+              <Feather name="lock" size={18} color={colors.textSecondary} />
               <TextInput
                 style={styles.input}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm new password"
-                placeholderTextColor="#444"
+                placeholderTextColor={colors.textSecondary}
                 secureTextEntry={!confirmPasswordVisible}
               />
               <TouchableOpacity
@@ -152,7 +157,7 @@ export default function ForgotPasswordScreen() {
                 <Feather
                   name={confirmPasswordVisible ? "eye-off" : "eye"}
                   size={18}
-                  color="#8e9e9f"
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -171,7 +176,7 @@ export default function ForgotPasswordScreen() {
           style={styles.backBtn}
           onPress={() => router.push("/")}
         >
-          <Ionicons name="arrow-back" size={20} color="#8e9e9f" />
+          <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
           <Text style={styles.backText}>Back to Login</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -179,71 +184,85 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#060606" },
-  content: { padding: 30, alignItems: "center" },
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.background 
+  },
+  content: { 
+    padding: 30, 
+    alignItems: "center" 
+  },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 60,
     marginBottom: 30,
-    shadowColor: "#00bcd4",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
     shadowRadius: 15,
+    elevation: 8,
   },
   heading: { 
     fontSize: 28, 
     fontWeight: "800", 
-    color: "#fff",
+    color: colors.text,
     marginBottom: 8 
   },
   subheading: { 
-    color: "#8e9e9f", 
+    color: colors.textSecondary, 
     marginBottom: 40,
     textAlign: "center",
     fontSize: 15,
     lineHeight: 22,
+    opacity: 0.7,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     paddingHorizontal: 15,
     height: 60,
     width: "100%",
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
     marginBottom: 15,
   },
   input: {
     flex: 1,
     marginLeft: 12,
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
   },
   primaryButton: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     borderRadius: 20,
     width: "100%",
     height: 60,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
+    elevation: 8,
   },
   disabledBtn: {
     opacity: 0.5,
   },
-  primaryText: { color: "#081a2e", fontWeight: "800", fontSize: 16, letterSpacing: 1 },
+  primaryText: { 
+    color: isDark ? "#081a2e" : "#fff", 
+    fontWeight: "800", 
+    fontSize: 16, 
+    letterSpacing: 1 
+  },
   backBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -251,7 +270,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   backText: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     marginLeft: 8,
     fontWeight: "600",
   }

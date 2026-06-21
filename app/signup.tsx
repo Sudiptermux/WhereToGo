@@ -1,6 +1,6 @@
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -12,10 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signUp } from "../services/authService";
 import { useTrip } from "../context/TripContext";
+import { useTheme } from "../context/ThemeContext";
 
 export default function SignupScreen() {
   const router = useRouter();
   const { updateProfile } = useTrip();
+  const { colors, isDark } = useTheme();
+  
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -25,6 +28,8 @@ export default function SignupScreen() {
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [phone, setPhone] = useState("");
   const [agreed, setAgreed] = useState(false);
+
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const onSignup = async () => {
     if (!name || !email || !password || !confirmPassword) {
@@ -44,12 +49,9 @@ export default function SignupScreen() {
     try {
       await signUp({ name, email, password, phone });
       
-      // Sync global profile
       updateProfile({ name });
 
-      alert(
-        "Signup successful! User identity created.",
-      );
+      alert("Signup successful! User identity created.");
       router.push({
         pathname: "/verify",
         params: { email },
@@ -66,7 +68,7 @@ export default function SignupScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.innerContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.logoCircle}>
-          <Ionicons name="compass" size={32} color="#081a2e" />
+          <Ionicons name="compass" size={32} color={isDark ? "#081a2e" : "#fff"} />
         </View>
 
         <Text style={styles.title}>Create Account</Text>
@@ -75,25 +77,25 @@ export default function SignupScreen() {
         <View style={styles.form}>
             <Text style={styles.label}>Full Name</Text>
             <View style={styles.inputContainer}>
-                <Feather name="user" size={18} color="#8e9e9f" />
+                <Feather name="user" size={18} color={colors.textSecondary} />
                 <TextInput
                     style={styles.input}
                     value={name}
                     onChangeText={setName}
                     placeholder="Enter your full name"
-                    placeholderTextColor="#444"
+                    placeholderTextColor={colors.textSecondary}
                 />
             </View>
 
             <Text style={styles.label}>Email Address</Text>
             <View style={styles.inputContainer}>
-                <MaterialIcons name="email" size={18} color="#8e9e9f" />
+                <MaterialIcons name="email" size={18} color={colors.textSecondary} />
                 <TextInput
                     style={styles.input}
                     value={email}
                     onChangeText={setEmail}
                     placeholder="Enter your email"
-                    placeholderTextColor="#444"
+                    placeholderTextColor={colors.textSecondary}
                     autoCapitalize="none"
                     keyboardType="email-address"
                 />
@@ -101,33 +103,33 @@ export default function SignupScreen() {
 
             <Text style={styles.label}>Password</Text>
             <View style={styles.inputContainer}>
-                <Feather name="lock" size={18} color="#8e9e9f" />
+                <Feather name="lock" size={18} color={colors.textSecondary} />
                 <TextInput
                     style={styles.input}
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Create a password"
-                    placeholderTextColor="#444"
+                    placeholderTextColor={colors.textSecondary}
                     secureTextEntry={!passwordVisible}
                 />
                 <TouchableOpacity onPress={() => setPasswordVisible((v) => !v)}>
                     <Feather
                     name={passwordVisible ? "eye-off" : "eye"}
                     size={18}
-                    color="#8e9e9f"
+                    color={colors.textSecondary}
                     />
                 </TouchableOpacity>
             </View>
 
             <Text style={styles.label}>Confirm Password</Text>
             <View style={styles.inputContainer}>
-                <Feather name="lock" size={18} color="#8e9e9f" />
+                <Feather name="lock" size={18} color={colors.textSecondary} />
                 <TextInput
                     style={styles.input}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="Confirm your password"
-                    placeholderTextColor="#444"
+                    placeholderTextColor={colors.textSecondary}
                     secureTextEntry={!confirmPasswordVisible}
                 />
                 <TouchableOpacity
@@ -136,7 +138,7 @@ export default function SignupScreen() {
                     <Feather
                     name={confirmPasswordVisible ? "eye-off" : "eye"}
                     size={18}
-                    color="#8e9e9f"
+                    color={colors.textSecondary}
                     />
                 </TouchableOpacity>
             </View>
@@ -146,7 +148,7 @@ export default function SignupScreen() {
                 onPress={() => setAgreed((v) => !v)}
             >
                 <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-                    {agreed && <Ionicons name="checkmark" size={14} color="#081a2e" />}
+                    {agreed && <Ionicons name="checkmark" size={14} color={isDark ? "#081a2e" : "#fff"} />}
                 </View>
                 <Text style={styles.checkboxText}>Accept Terms & Conditions</Text>
             </TouchableOpacity>
@@ -178,10 +180,10 @@ export default function SignupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
   },
   innerContainer: {
     padding: 24,
@@ -191,27 +193,29 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 16,
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
     marginBottom: 15,
-    shadowColor: "#00bcd4",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
     shadowRadius: 10,
+    elevation: 8,
   },
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#fff",
+    color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     marginBottom: 30,
     fontWeight: "500",
+    opacity: 0.7,
   },
   form: {
     width: "100%",
@@ -219,27 +223,28 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     marginBottom: 8,
     marginTop: 15,
     letterSpacing: 1,
+    opacity: 0.6,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     paddingHorizontal: 15,
     height: 55,
     width: "100%",
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
   },
   input: {
     flex: 1,
     marginLeft: 11,
     fontSize: 15,
-    color: "#fff",
+    color: colors.text,
   },
   checkboxRow: {
     flexDirection: "row",
@@ -251,41 +256,41 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderWidth: 1.5,
-    borderColor: "#1a1a1a",
-    backgroundColor: "#121212",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     borderRadius: 6,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
   checkboxChecked: {
-    backgroundColor: "#00bcd4",
-    borderColor: "#00bcd4",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkboxText: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: "500",
   },
   primaryButton: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     width: "100%",
     height: 60,
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
-    elevation: 5,
+    elevation: 8,
   },
   primaryButtonDisabled: {
     opacity: 0.5,
   },
   primaryText: {
-    color: "#081a2e",
+    color: isDark ? "#081a2e" : "#fff",
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 1,
@@ -296,12 +301,12 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   loginLinkText: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: "500",
   },
   cta: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontWeight: "800",
   },
 });

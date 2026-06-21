@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -11,12 +11,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { confirmSignUp, resendConfirmationCode } from "../services/authService";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function VerifyScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
+  const { colors, isDark } = useTheme();
+  
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const onVerify = async () => {
     if (!code.trim()) {
@@ -64,7 +69,7 @@ export default function VerifyScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.iconCircle}>
-          <Ionicons name="mail-open" size={32} color="#081a2e" />
+          <Ionicons name="mail-open" size={32} color={isDark ? "#081a2e" : "#fff"} />
         </View>
 
         <Text style={styles.heading}>Email Verification</Text>
@@ -78,7 +83,7 @@ export default function VerifyScreen() {
             value={code}
             onChangeText={setCode}
             placeholder="00000000"
-            placeholderTextColor="#444"
+            placeholderTextColor={colors.textSecondary}
             keyboardType="number-pad"
             maxLength={8}
             />
@@ -102,7 +107,7 @@ export default function VerifyScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color="#8e9e9f" />
+            <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
             <Text style={styles.backText}>Back to Signup</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -110,80 +115,104 @@ export default function VerifyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#060606" },
-  content: { padding: 30, alignItems: "center" },
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.background 
+  },
+  content: { 
+    padding: 30, 
+    alignItems: "center" 
+  },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 60,
     marginBottom: 30,
-    shadowColor: "#00bcd4",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
     shadowRadius: 15,
+    elevation: 8,
   },
   heading: { 
     fontSize: 28, 
     fontWeight: "800", 
-    color: "#fff",
+    color: colors.text,
     marginBottom: 8 
   },
   subheading: { 
-    color: "#8e9e9f", 
+    color: colors.textSecondary, 
     marginBottom: 40,
     textAlign: "center",
     fontSize: 15,
     lineHeight: 22,
+    opacity: 0.7,
   },
   inputWrapper: {
     width: "100%",
     marginBottom: 30,
   },
   input: {
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 18,
     height: 65,
     paddingHorizontal: 20,
-    color: "#fff",
+    color: colors.text,
     fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
     letterSpacing: 8,
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
   },
   primaryButton: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     borderRadius: 20,
     width: "100%",
     height: 60,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
+    elevation: 8,
   },
   primaryButtonDisabled: {
     opacity: 0.5,
   },
-  primaryText: { color: "#081a2e", fontWeight: "800", fontSize: 16, letterSpacing: 1 },
-  linkButton: { alignItems: "center", marginTop: 20 },
-  linkText: { color: "#8e9e9f", fontWeight: "500", fontSize: 14 },
-  cta: { color: "#00bcd4", fontWeight: "800" },
+  primaryText: { 
+    color: isDark ? "#081a2e" : "#fff", 
+    fontWeight: "800", 
+    fontSize: 16, 
+    letterSpacing: 1 
+  },
+  linkButton: { 
+    alignItems: "center", 
+    marginTop: 20 
+  },
+  linkText: { 
+    color: colors.textSecondary, 
+    fontWeight: "500", 
+    fontSize: 14 
+  },
+  cta: { 
+    color: colors.primary, 
+    fontWeight: "800" 
+  },
   backBtn: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 60,
   },
   backText: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     marginLeft: 8,
     fontWeight: "600",
   }

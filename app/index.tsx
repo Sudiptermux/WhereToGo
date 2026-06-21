@@ -1,6 +1,6 @@
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -8,10 +8,13 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signIn } from "../services/authService";
 import { useTrip } from "../context/TripContext";
+import { supabase } from "../services/supabaseClient";
+import { useTheme } from "../context/ThemeContext";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -19,9 +22,30 @@ export default function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   const [loading, setLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const { updateProfile } = useTrip();
+
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
+  React.useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          router.replace("/(tabs)/home");
+        } else {
+          setIsCheckingSession(false);
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+        setIsCheckingSession(false);
+      }
+    };
+    checkSession();
+  }, []);
 
   const onLogin = async () => {
     if (!email.trim() || !password) {
@@ -33,7 +57,6 @@ export default function LoginScreen() {
     try {
       await signIn({ email, password });
       
-      // Personalize: Extract name from email for the Demo Mode
       const inferredName = email.split('@')[0].split('.')[0];
       const capitalized = inferredName.charAt(0).toUpperCase() + inferredName.slice(1);
       updateProfile({ name: capitalized });
@@ -47,11 +70,19 @@ export default function LoginScreen() {
     }
   };
 
+  if (isCheckingSession) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.innerContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.logoCircle}>
-          <Ionicons name="compass" size={40} color="#081a2e" />
+          <Ionicons name="compass" size={40} color={isDark ? "#081a2e" : "#fff"} />
         </View>
 
         <Text style={styles.title}>WhereToGo</Text>
@@ -60,12 +91,12 @@ export default function LoginScreen() {
         <View style={styles.form}>
             <Text style={styles.label}>Email Address</Text>
             <View style={styles.inputContainer}>
-                <MaterialIcons name="email" size={20} color="#8e9e9f" />
+                <MaterialIcons name="email" size={20} color={colors.textSecondary} />
                 <TextInput
                     value={email}
                     onChangeText={setEmail}
                     placeholder="Enter your email"
-                    placeholderTextColor="#444"
+                    placeholderTextColor={colors.textSecondary}
                     autoCapitalize="none"
                     keyboardType="email-address"
                     style={styles.input}
@@ -74,12 +105,12 @@ export default function LoginScreen() {
 
             <Text style={[styles.label, { marginTop: 20 }]}>Password</Text>
             <View style={styles.inputContainer}>
-                <Feather name="lock" size={20} color="#8e9e9f" />
+                <Feather name="lock" size={20} color={colors.textSecondary} />
                 <TextInput
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Enter your password"
-                    placeholderTextColor="#444"
+                    placeholderTextColor={colors.textSecondary}
                     secureTextEntry={!passwordVisible}
                     style={styles.input}
                 />
@@ -89,7 +120,7 @@ export default function LoginScreen() {
                     <Feather
                         name={passwordVisible ? "eye-off" : "eye"}
                         size={20}
-                        color="#8e9e9f"
+                        color={colors.textSecondary}
                     />
                 </TouchableOpacity>
             </View>
@@ -102,7 +133,7 @@ export default function LoginScreen() {
                     <View
                     style={[styles.checkbox, rememberMe && styles.checkboxChecked]}
                     >
-                    {rememberMe && <Ionicons name="checkmark" size={14} color="#081a2e" />}
+                    {rememberMe && <Ionicons name="checkmark" size={14} color={isDark ? "#081a2e" : "#fff"} />}
                     </View>
                     <Text style={styles.checkboxText}>Remember me</Text>
                 </TouchableOpacity>
@@ -132,11 +163,11 @@ export default function LoginScreen() {
 
             <View style={styles.socialRow}>
                 <TouchableOpacity style={styles.socialButton}>
-                    <Ionicons name="logo-google" size={20} color="#fff" />
+                    <Ionicons name="logo-google" size={20} color={colors.text} />
                     <Text style={styles.socialText}>Google</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.socialButton}>
-                    <Ionicons name="logo-apple" size={22} color="#fff" />
+                    <Ionicons name="logo-apple" size={22} color={colors.text} />
                     <Text style={styles.socialText}>Apple</Text>
                 </TouchableOpacity>
             </View>
@@ -155,10 +186,10 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#060606",
+    backgroundColor: colors.background,
   },
   innerContainer: {
     padding: 24,
@@ -168,27 +199,29 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 24,
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 40,
     marginBottom: 20,
-    shadowColor: "#00bcd4",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
     shadowRadius: 15,
+    elevation: 10,
   },
   title: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#fff",
+    color: colors.text,
     letterSpacing: -1,
   },
   subtitle: {
     fontSize: 16,
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     marginBottom: 40,
     fontWeight: "500",
+    opacity: 0.7,
   },
   form: {
     width: "100%",
@@ -196,25 +229,26 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     marginBottom: 10,
     letterSpacing: 1,
+    opacity: 0.6,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     paddingHorizontal: 15,
     height: 60,
     width: "100%",
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
   },
   input: {
     flex: 1,
     marginLeft: 12,
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
   },
   optionsRow: {
@@ -232,46 +266,46 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderWidth: 1.5,
-    borderColor: "#1a1a1a",
-    backgroundColor: "#121212",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     borderRadius: 6,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
   checkboxChecked: {
-    backgroundColor: "#00bcd4",
-    borderColor: "#00bcd4",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkboxText: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: "500",
   },
   forgot: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontWeight: "700",
     fontSize: 14,
   },
   primaryButton: {
-    backgroundColor: "#00bcd4",
+    backgroundColor: colors.primary,
     width: "100%",
     height: 60,
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
-    shadowColor: "#00bcd4",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
-    elevation: 5,
+    elevation: 8,
   },
   primaryButtonDisabled: {
     opacity: 0.5,
   },
   primaryText: {
-    color: "#081a2e",
+    color: isDark ? "#081a2e" : "#fff",
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 1,
@@ -285,14 +319,15 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.border,
   },
   dividerText: {
     marginHorizontal: 15,
-    color: "#444",
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1,
+    opacity: 0.5,
   },
   socialRow: {
     width: "100%",
@@ -301,10 +336,10 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   socialButton: {
-    backgroundColor: "#121212",
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#1a1a1a",
+    borderColor: colors.border,
     width: "48%",
     height: 56,
     flexDirection: "row",
@@ -312,7 +347,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   socialText: {
-    color: "#fff",
+    color: colors.text,
     fontWeight: "700",
     marginLeft: 10,
     fontSize: 15,
@@ -322,12 +357,12 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   createAccountText: {
-    color: "#8e9e9f",
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: "500",
   },
   cta: {
-    color: "#00bcd4",
+    color: colors.primary,
     fontWeight: "800",
   },
 });
