@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { View } from "react-native";
+import React, { useEffect, useState, useMemo } from "react";
+import { View, StyleSheet, Platform } from "react-native";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import AnimatedSplash from "../components/AnimatedSplash";
@@ -31,14 +31,42 @@ function LayoutContent() {
     setIsSplashComplete(true);
   };
 
+  const styles = useMemo(() => {
+    return StyleSheet.create({
+      outerContainer: {
+        flex: 1,
+        backgroundColor: isDark ? '#000000' : '#eceff1',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      innerContainer: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: colors.background,
+        ...(Platform.OS === 'web' ? {
+          maxWidth: 500,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.15,
+          shadowRadius: 30,
+          borderLeftWidth: 1,
+          borderRightWidth: 1,
+          borderColor: colors.border,
+        } : {}),
+      }
+    });
+  }, [colors, isDark]);
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      {!isSplashComplete ? (
-        <AnimatedSplash onAnimationComplete={handleAnimationComplete} />
-      ) : (
-        <Stack screenOptions={{ headerShown: false }} />
-      )}
+    <View style={styles.outerContainer}>
+      <View style={styles.innerContainer}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        {!isSplashComplete ? (
+          <AnimatedSplash onAnimationComplete={handleAnimationComplete} />
+        ) : (
+          <Stack screenOptions={{ headerShown: false }} />
+        )}
+      </View>
     </View>
   );
 }

@@ -18,7 +18,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTrip, Place } from "../context/TripContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker, Polyline, UrlTile, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Polyline, UrlTile, PROVIDER_GOOGLE } from "../components/MapViewShim";
 import { useTheme } from "../context/ThemeContext";
 
 const { width, height } = Dimensions.get("window");

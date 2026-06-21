@@ -1,5 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+
+const customStorage = {
+  getItem: (key: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') return Promise.resolve(null);
+      return Promise.resolve(window.localStorage.getItem(key));
+    }
+    return AsyncStorage.getItem(key);
+  },
+  setItem: (key: string, value: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') return Promise.resolve();
+      window.localStorage.setItem(key, value);
+      return Promise.resolve();
+    }
+    return AsyncStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') return Promise.resolve();
+      window.localStorage.removeItem(key);
+      return Promise.resolve();
+    }
+    return AsyncStorage.removeItem(key);
+  },
+};
 
 // IMPORTANT: Replace these with your actual Supabase project credentials.
 // For security, in a production environment, these should be handled 
@@ -9,7 +36,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: AsyncStorage,
+    storage: customStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
