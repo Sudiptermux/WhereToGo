@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
     ActivityIndicator,
+    Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signIn } from "../services/authService";
@@ -82,7 +83,11 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.innerContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.logoCircle}>
-          <Ionicons name="compass" size={40} color={isDark ? "#081a2e" : "#fff"} />
+          <Image 
+            source={require("../assets/images/logo.png")} 
+            style={styles.logoImage} 
+            resizeMode="cover" 
+          />
         </View>
 
         <Text style={styles.title}>WhereToGo</Text>
@@ -199,9 +204,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 24,
-    backgroundColor: colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
+    overflow: 'hidden',
     marginTop: 40,
     marginBottom: 20,
     shadowColor: colors.primary,
@@ -209,6 +212,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 15,
     elevation: 10,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   title: {
     fontSize: 32,

@@ -8,6 +8,7 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signUp } from "../services/authService";
@@ -68,7 +69,11 @@ export default function SignupScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.innerContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.logoCircle}>
-          <Ionicons name="compass" size={32} color={isDark ? "#081a2e" : "#fff"} />
+          <Image 
+            source={require("../assets/images/logo.png")} 
+            style={styles.logoImage} 
+            resizeMode="cover" 
+          />
         </View>
 
         <Text style={styles.title}>Create Account</Text>
@@ -193,9 +198,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 16,
-    backgroundColor: colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
+    overflow: 'hidden',
     marginTop: 20,
     marginBottom: 15,
     shadowColor: colors.primary,
@@ -203,6 +206,10 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   title: {
     fontSize: 28,
