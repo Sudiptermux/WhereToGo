@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { View, StyleSheet, Platform } from "react-native";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import AnimatedSplash from "../components/AnimatedSplash";
 import { StatusBar } from "expo-status-bar";
 import { TripProvider } from "../context/TripContext";
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
@@ -11,25 +10,18 @@ import { ThemeProvider, useTheme } from "../context/ThemeContext";
 SplashScreen.preventAutoHideAsync();
 
 function LayoutContent() {
-  const [isSplashComplete, setIsSplashComplete] = useState(false);
   const { theme, colors, isDark } = useTheme();
 
   useEffect(() => {
     const hideNativeSplash = async () => {
       try {
-        setTimeout(async () => {
-          await SplashScreen.hideAsync();
-        }, 300);
+        await SplashScreen.hideAsync();
       } catch (e) {
         console.warn(e);
       }
     };
     hideNativeSplash();
   }, []);
-
-  const handleAnimationComplete = () => {
-    setIsSplashComplete(true);
-  };
 
   const styles = useMemo(() => {
     return StyleSheet.create({
@@ -61,11 +53,7 @@ function LayoutContent() {
     <View style={styles.outerContainer}>
       <View style={styles.innerContainer}>
         <StatusBar style={isDark ? "light" : "dark"} />
-        {!isSplashComplete ? (
-          <AnimatedSplash onAnimationComplete={handleAnimationComplete} />
-        ) : (
-          <Stack screenOptions={{ headerShown: false }} />
-        )}
+        <Stack screenOptions={{ headerShown: false }} />
       </View>
     </View>
   );
