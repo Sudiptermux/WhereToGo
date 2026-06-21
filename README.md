@@ -228,4 +228,4 @@ WhereToGo/
 
 ---
 
-*Curated with ❤️ by the WhereToGo Team.*
+*Curated with ❤️ by the WhereToGo Development Team.*
