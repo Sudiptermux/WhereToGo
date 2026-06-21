@@ -48,6 +48,7 @@ export type SavedTrip = {
     endTime?: string;
   }[];
   stayLocation: Place | null;
+  startDate: string; // ISO string
   dateCreated: string;
   visitedPlaces: string[]; // Stores UUIDs
 };
@@ -62,6 +63,7 @@ interface TripContextType {
   selectedPlaces: Place[];
   stayLocation: Place | null;
   numberOfDays: number;
+  startDate: Date;
   optimizedJourney: { 
     day: number; 
     places: Place[];
@@ -79,6 +81,7 @@ interface TripContextType {
   removeFromTrip: (id: string) => void;
   setStayLocation: (place: Place | null) => void;
   setNumberOfDays: (days: number) => void;
+  setStartDate: (date: Date) => void;
   setOptimizedJourney: (journey: { 
     day: number; 
     places: Place[];
@@ -109,6 +112,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const [selectedPlaces, setSelectedPlaces] = useState<Place[]>([]);
   const [stayLocation, setStayLocation] = useState<Place | null>(null);
   const [numberOfDays, setNumberOfDays] = useState<number>(3);
+  const [startDate, setStartDate] = useState<Date>(new Date());
   const [optimizedJourney, setOptimizedJourney] = useState<{ 
     day: number; 
     places: Place[];
@@ -180,11 +184,12 @@ export function TripProvider({ children }: { children: ReactNode }) {
     // 1. Sync Profile
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (profile) {
-        setUserProfile({
-            name: profile.name,
-            avatar: profile.avatar_url,
-            level: profile.level
-        });
+        setUserProfile(prev => ({
+            ...prev,
+            name: profile.name || prev.name,
+            avatar: profile.avatar_url || prev.avatar,
+            level: profile.level || prev.level
+        }));
     }
 
     // 2. Sync Activity (UUID based)
@@ -207,10 +212,11 @@ export function TripProvider({ children }: { children: ReactNode }) {
             status: t.status,
             statusColor: t.status_color,
             image: t.image_url,
-            days: t.trip_data as any[],
+            days: Array.isArray(t.trip_data) ? t.trip_data : (t.trip_data?.days || []),
             stayLocation: null,
             dateCreated: t.created_at,
-            visitedPlaces: t.visited_places || []
+            visitedPlaces: t.visited_places || [],
+            startDate: !Array.isArray(t.trip_data) && t.trip_data?.startDate ? t.trip_data.startDate : null
         }));
         setSavedTrips(mappedTrips);
     }
@@ -331,7 +337,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         await supabase.from('trips').update({
           title: updatedTrip.title,
           status: updatedTrip.status,
-          trip_data: updatedTrip.days,
+          trip_data: { ...updatedTrip, startDate: updatedTrip.startDate },
           visited_places: updatedTrip.visitedPlaces
         }).eq('id', activeTripId);
       }
@@ -339,16 +345,20 @@ export function TripProvider({ children }: { children: ReactNode }) {
     }
 
     const tempId = Date.now().toString();
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + (numberOfDays - 1));
+
     const newTrip: SavedTrip = {
       id: tempId,
       title: `Trip to ${stayLocation?.location_display || "Bhubaneswar"}`,
-      dates: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + " - " + 
-             new Date(Date.now() + 86400000 * (numberOfDays || 1)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      dates: startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + " - " + 
+             endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       status: isComplete ? 'COMPLETE' : 'DRAFT',
       statusColor: isComplete ? '#00bcd4' : '#FF9800',
       image: optimizedJourney[0]?.places[0]?.image || "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&q=80&w=600",
       days: [...optimizedJourney],
       stayLocation: stayLocation,
+      startDate: startDate.toISOString(),
       dateCreated: new Date().toISOString(),
       visitedPlaces: [...visitedPlaces]
     };
@@ -364,7 +374,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
             status: newTrip.status,
             status_color: newTrip.statusColor,
             image_url: typeof newTrip.image === 'string' ? newTrip.image : null,
-            trip_data: newTrip.days,
+            trip_data: { ...newTrip, startDate: newTrip.startDate }, // Store metadata in JSONB
             visited_places: newTrip.visitedPlaces,
             stay_location_id: stayLocation?.id // UUID
         }).select().single();
@@ -381,6 +391,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
     setStayLocation(trip.stayLocation);
     setVisitedPlaces(trip.visitedPlaces);
     setActiveTripId(trip.id);
+    setStartDate(trip.startDate ? new Date(trip.startDate) : new Date());
     const allPlaces = trip.days.flatMap(d => d.places);
     setSelectedPlaces(allPlaces);
     setNumberOfDays(trip.days.length);
@@ -390,6 +401,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
     setSelectedPlaces([]);
     setStayLocation(null);
     setNumberOfDays(3);
+    setStartDate(new Date());
     setOptimizedJourney([]);
     setVisitedPlaces([]);
     setActiveTripId(null);
@@ -418,6 +430,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         selectedPlaces,
         stayLocation,
         numberOfDays,
+        startDate,
         optimizedJourney,
         visitedPlaces,
         lifetimeVisitedPlaces,
@@ -427,6 +440,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         removeFromTrip,
         setStayLocation,
         setNumberOfDays,
+        setStartDate,
         setOptimizedJourney,
         toggleVisited,
         isVisited,
